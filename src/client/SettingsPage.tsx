@@ -1,13 +1,14 @@
 /**
  * dsh-subagent-manager — "Sub-agent Manager" settings page (M3).
  *
- * Reads/writes the host `/plugins/subagent-manager/state` route (GET polls,
+ * Reads/writes the host `/plugins/dsh-subagent-manager/state` route (GET polls,
  * POST writes) so all mutations ride the DSH process. Polls every ~3s with an
  * in-flight guard, and refreshes on window focus.
  */
 import { useEffect, useRef, useState } from 'react'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import { SUBAGENT_MANAGER_LOCALE_NAMESPACE } from './locales.ts'
+import styles from './SettingsPage.module.css'
 
 export interface SettingsPageProps {
   close?: () => void
@@ -44,7 +45,7 @@ interface State {
 
 const EMPTY_STATE: State = { templates: [], running: [], revision: 0 }
 const POLL_MS = 3000
-const STATE_URL = '/plugins/subagent-manager/state'
+const STATE_URL = '/plugins/dsh-subagent-manager/state'
 
 async function readState(signal?: AbortSignal): Promise<State> {
   const res = await fetch(STATE_URL, { cache: 'no-store', signal })
@@ -183,39 +184,44 @@ export function SettingsPage({
   const { templates, running } = state
 
   return (
-    <section className="dsh-subagent-manager">
-      <header>
+    <section className={styles.page}>
+      <header className={styles.header}>
         <h2>{t('settings.title')}</h2>
-        <p>{t('settings.subtitle')}</p>
-        <div>
+        <p className={styles.subtitle}>{t('settings.subtitle')}</p>
+        <div className={styles.toolbar}>
           <button onClick={() => setEditing(blank())}>{t('template.create')}</button>
           <button onClick={exportJson}>{t('template.export')}</button>
-          <label>{t('template.import')}
+          <label className={styles.import}>
+            {t('template.import')}
             <input type="file" accept="application/json" onChange={(e) => { const f = e.target.files?.[0]; if (f) void importJson(f) }} />
           </label>
         </div>
       </header>
 
-      {error && <p className="error">{error}</p>}
-      {notice && <p className="notice">{notice}</p>}
+      {error && <p className={styles.error}>{error}</p>}
+      {notice && <p className={styles.notice}>{notice}</p>}
 
       {templates.length === 0 ? (
-        <p>{t('template.empty')}</p>
+        <p className={styles.empty}>{t('template.empty')}</p>
       ) : (
-        <ul>
+        <ul className={styles.list}>
           {templates.map((tmpl) => (
-            <li key={tmpl.id}>
-              <strong>{tmpl.label}</strong> <code>{tmpl.id}</code>
-              <span> · {tmpl.role} · {tmpl.permissionMode} · {tmpl.model || tmpl.provider}</span>
-              <label>
-                <input type="checkbox" checked={tmpl.enabled} onChange={(e) => void setEnabled(tmpl.id, e.target.checked)} />
-                {' '}{t('template.enabled')}
-              </label>
-              <button onClick={() => setEditing(tmpl)}>{t('template.edit')}</button>
-              <button onClick={() => void duplicate(tmpl.id)}>{t('template.duplicate')}</button>
-              <button onClick={() => void joinTeam(tmpl.id)}>{t('template.joinTeam')}</button>
-              <button onClick={() => void remove(tmpl.id)}>{t('template.delete')}</button>
-              {running.some((r) => r.templateId === tmpl.id) && <span className="running">●</span>}
+            <li key={tmpl.id} className={styles.card}>
+              <div className={styles.cardMain}>
+                <strong>{tmpl.label}</strong> <code>{tmpl.id}</code>
+                <span className={styles.meta}> · {tmpl.role} · {tmpl.permissionMode} · {tmpl.model || tmpl.provider}</span>
+              </div>
+              <div className={styles.cardActions}>
+                <label className={styles.enable}>
+                  <input type="checkbox" checked={tmpl.enabled} onChange={(e) => void setEnabled(tmpl.id, e.target.checked)} />
+                  {' '}{t('template.enabled')}
+                </label>
+                <button onClick={() => setEditing(tmpl)}>{t('template.edit')}</button>
+                <button onClick={() => void duplicate(tmpl.id)}>{t('template.duplicate')}</button>
+                <button onClick={() => void joinTeam(tmpl.id)}>{t('template.joinTeam')}</button>
+                <button onClick={() => void remove(tmpl.id)}>{t('template.delete')}</button>
+                {running.some((r) => r.templateId === tmpl.id) && <span className={styles.running} title="running">●</span>}
+              </div>
             </li>
           ))}
         </ul>
@@ -232,12 +238,14 @@ export function SettingsPage({
       )}
 
       {running.length > 0 && (
-        <section className="running">
+        <section className={styles.running}>
           <h3>{t('template.running')}</h3>
-          <ul>
+          <ul className={styles.list}>
             {running.map((r) => (
-              <li key={r.childId}>
-                <code>{r.childId}</code> · {r.templateId} · {r.status}
+              <li key={r.childId} className={styles.card}>
+                <div className={styles.cardMain}>
+                  <code>{r.childId}</code> · {r.templateId} · {r.status}
+                </div>
                 <button onClick={() => void stopInstance(r.childId)}>{t('template.stop')}</button>
               </li>
             ))}
@@ -261,23 +269,58 @@ function TemplateForm({ initial, isNew, onSave, onCancel, t }: {
   const set = (patch: Partial<Tmpl>): void => setDraft((d) => ({ ...d, ...patch }))
   const submit = (e: React.FormEvent): void => { e.preventDefault(); void onSave(draft) }
   return (
-    <form onSubmit={submit}>
-      <label>{t('template.id')} <input value={draft.id} disabled={!isNew} onChange={(e) => set({ id: e.target.value })} /></label>
-      <label>{t('template.name')} <input value={draft.name} onChange={(e) => set({ name: e.target.value })} /></label>
-      <label>{t('template.label')} <input value={draft.label} onChange={(e) => set({ label: e.target.value })} /></label>
-      <label>{t('template.role')} <input value={draft.role} onChange={(e) => set({ role: e.target.value })} /></label>
-      <label>{t('template.persona')} <textarea value={draft.persona ?? ''} onChange={(e) => set({ persona: e.target.value })} /></label>
-      <label>{t('template.provider')} <input value={draft.provider} onChange={(e) => set({ provider: e.target.value })} /></label>
-      <label>{t('template.model')} <input value={draft.model ?? ''} onChange={(e) => set({ model: e.target.value })} /></label>
-      <label>{t('template.permissionMode')}
-        <select value={draft.permissionMode} onChange={(e) => set({ permissionMode: e.target.value as Tmpl['permissionMode'] })}>
-          <option value="readonly">readonly</option><option value="workspace">workspace</option><option value="full">full</option>
-        </select>
-      </label>
-      <label>{t('template.maxDepth')} <input type="number" min={0} value={draft.maxDepth ?? 1} onChange={(e) => set({ maxDepth: Number(e.target.value) })} /></label>
-      <label><input type="checkbox" checked={draft.enabled} onChange={(e) => set({ enabled: e.target.checked })} /> {t('template.enabled')}</label>
-      <button type="submit">{t('template.save')}</button>
-      <button type="button" onClick={onCancel}>{t('template.cancel')}</button>
+    <form className={styles.form} onSubmit={submit}>
+      <div className={styles.formGrid}>
+        <label className={styles.field}>
+          <span className={styles.label}>{t('template.id')}</span>
+          <input value={draft.id} disabled={!isNew} onChange={(e) => set({ id: e.target.value })} />
+        </label>
+        <label className={styles.field}>
+          <span className={styles.label}>{t('template.name')}</span>
+          <input value={draft.name} onChange={(e) => set({ name: e.target.value })} />
+        </label>
+        <label className={styles.field}>
+          <span className={styles.label}>{t('template.label')}</span>
+          <input value={draft.label} onChange={(e) => set({ label: e.target.value })} />
+        </label>
+        <label className={styles.field}>
+          <span className={styles.label}>{t('template.role')}</span>
+          <input value={draft.role} onChange={(e) => set({ role: e.target.value })} />
+        </label>
+        <label className={styles.field}>
+          <span className={styles.label}>{t('template.provider')}</span>
+          <input value={draft.provider} onChange={(e) => set({ provider: e.target.value })} />
+        </label>
+        <label className={styles.field}>
+          <span className={styles.label}>{t('template.model')}</span>
+          <input value={draft.model ?? ''} onChange={(e) => set({ model: e.target.value })} />
+        </label>
+        <label className={styles.field}>
+          <span className={styles.label}>{t('template.permissionMode')}</span>
+          <select value={draft.permissionMode} onChange={(e) => set({ permissionMode: e.target.value as Tmpl['permissionMode'] })}>
+            <option value="readonly">readonly</option><option value="workspace">workspace</option><option value="full">full</option>
+          </select>
+        </label>
+        <label className={styles.field}>
+          <span className={styles.label}>{t('template.maxDepth')}</span>
+          <input type="number" min={0} value={draft.maxDepth ?? 1} onChange={(e) => set({ maxDepth: Number(e.target.value) })} />
+        </label>
+        <label className={styles.fieldFull}>
+          <span className={styles.label}>{t('template.persona')}</span>
+          <textarea rows={3} value={draft.persona ?? ''} onChange={(e) => set({ persona: e.target.value })} />
+        </label>
+      </div>
+
+      <div className={styles.formFooter}>
+        <label className={styles.enable}>
+          <input type="checkbox" checked={draft.enabled} onChange={(e) => set({ enabled: e.target.checked })} />
+          {' '}{t('template.enabled')}
+        </label>
+        <div className={styles.formButtons}>
+          <button type="submit">{t('template.save')}</button>
+          <button type="button" onClick={onCancel}>{t('template.cancel')}</button>
+        </div>
+      </div>
     </form>
   )
 }

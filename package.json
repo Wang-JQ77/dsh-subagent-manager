@@ -1,6 +1,6 @@
 {
   "name": "dsh-subagent-manager",
-  "version": "0.1.0-rc.1",
+  "version": "0.1.0-rc.2",
   "description": "Sub-agent template manager for DeepSeek Harness (DSH): create/edit/enable sub-agent templates, launch them as durable continuable children, and join templates into dsh-agent-teams as members (template = member).",
   "type": "module",
   "main": "lib/index.js",

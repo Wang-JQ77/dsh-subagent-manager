@@ -37,6 +37,9 @@ interface WebRouteHost {
 /** Web-server service key candidates, newest first. */
 const WEB_SERVER_KEYS = ['webServer', 'httpServer'] as const
 
+/** Settings-page data route, following the `/plugins/<package>/state` convention. */
+const STATE_ROUTE_PATH = '/plugins/dsh-subagent-manager/state'
+
 export const name = 'subagent-manager'
 export const inject = ['tools', 'systemPrompt']
 
@@ -61,8 +64,17 @@ export function apply(ctx: Context, config: Config): void {
 
   // Host route: settings page reads (GET) and writes (POST) through the same
   // DSH process. Conflicts are detected via the monotonic write revision.
-  const ws = detectWebServer(ctx)
-  if (ws) {
+  // `webServer` may bind AFTER this plugin during concurrent activation, so the
+  // route is registered lazily: try now, then re-try on each service-bind
+  // event (mirrors the agent-teams pattern). In a webless profile the plugin
+  // stays tool/roster-only and never blocks boot.
+  let stateRouteRegistered = false
+  const registerStateRoute = (): void => {
+    if (stateRouteRegistered) return
+    const ws = detectWebServer(ctx)
+    if (!ws) return
+    stateRouteRegistered = true
+
     const handler = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
       const mgr = ctx.subagentManager
       if (req.method === 'GET') {
@@ -96,15 +108,16 @@ export function apply(ctx: Context, config: Config): void {
       }
       return sendJson(res, 405, { error: 'METHOD_NOT_ALLOWED', message: 'Use GET to read or POST to write.' })
     }
-    ctx.effect(() => ws.register({ kind: 'exact', path: '/plugins/subagent-manager/state', handler }))
-  } else {
-    // Feature-detect failure is an explicit report, never a silent hang.
-    ctx.logger.warn?.(
-      '[subagent-manager] no web server service (webServer/httpServer) resolved; the settings page route is disabled. Install dsh-host-webserver in this profile.',
-    )
+
+    ctx.effect(() => ws.register({ kind: 'exact', path: STATE_ROUTE_PATH, handler }))
   }
 
-  // M4: systemPrompt roster section + agent-teams member join.
+  registerStateRoute()
+  ctx.on('internal/service', (name: string) => {
+    if (name === 'webServer' || name === 'httpServer') registerStateRoute()
+  })
+
+  // M4: agent-teams member join is driven in-session via the roster + tools.
 }
 
 /** Dispatch a settings write action to the template registry service. */
