@@ -48,10 +48,10 @@ test('full flow: seed 閳?CRUD 閳?enable 閳?launch 閳?running 閳?stop 閳?ar
   const svc = new SubagentManager(ctx, cfg, memoryStorage())
   await svc.ready()
 
-  // 1. Seed: 3 built-in templates, all disabled + readonly.
+  // 1. Seed: 3 built-in templates, all enabled (default) + readonly.
   const seeded = await svc.list()
   assert.equal(seeded.length, 3)
-  for (const t of seeded) assert.equal(t.enabled, false)
+  for (const t of seeded) assert.equal(t.enabled, true)
   assert.ok(seeded.some((t) => t.id === 'code-reviewer'))
   assert.ok(seeded.some((t) => t.id === 'security-auditor'))
   assert.ok(seeded.some((t) => t.id === 'doc-writer'))
@@ -90,8 +90,9 @@ test('full flow: seed 閳?CRUD 閳?enable 閳?launch 閳?running 閳?stop 閳?ar
   assert.equal(running[0].templateId, 'code-reviewer')
 
   // 7. Launch a disabled template rejects; full+enabled rejects.
+  await svc.setEnabled('security-auditor', false)
   await assert.rejects(() => svc.launch('security-auditor', { prompt: [{ type: 'text', text: 'x' }], parent: {}, signal: new AbortController().signal }), /disabled/)
-  await assert.rejects(() => svc.setEnabled('test-runner', true).then(() => svc.create({ id: 'danger', name: 'd', name: 'D', role: 'r', permissionMode: 'full', enabled: true, memberProvider: 'spawn', provider: 'spawn', tags: [], schemaVersion: 1 })), /full.*enabled/)
+  await assert.rejects(() => svc.create({ id: 'danger', name: 'D', role: 'r', permissionMode: 'full', enabled: true, memberProvider: 'spawn', provider: 'spawn', tags: [], schemaVersion: 1 }), /full.*enabled/)
 
   // 8. Archive removes; running instance unaffected by archive of a different template.
   await svc.archive('security-auditor')
@@ -104,7 +105,7 @@ test('full flow: seed 閳?CRUD 閳?enable 閳?launch 閳?running 閳?stop 閳?ar
 
   // 10. member params for agent-teams (template = member).
   const member = svc.memberParams('code-reviewer')
-  assert.equal(member.provider, 'spawn')
+  assert.equal(member.provider, 'fork')
   assert.equal(member.persona.includes('rigorous'), true) // role now carries the merged persona
 
   // 11. Stop clears the running registry.

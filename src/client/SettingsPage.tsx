@@ -69,9 +69,9 @@ async function write(action: string, payload: unknown, expectedRevision: number)
 
 function blank(): Tmpl {
   return {
-    id: '', name: '', role: '', provider: 'spawn', model: '',
-    reasoningEffort: 'medium', permissionMode: 'readonly', agentPreset: 'standard', memberProvider: 'spawn', maxDepth: 1,
-    enabled: false, tags: [], description: '', schemaVersion: 1,
+    id: '', name: '', role: '', provider: 'fork', model: '',
+    reasoningEffort: 'medium', permissionMode: 'readonly', agentPreset: 'standard', memberProvider: 'fork', maxDepth: 1,
+    enabled: true, tags: [], description: '', schemaVersion: 1,
   }
 }
 
@@ -302,7 +302,14 @@ function TemplateForm({ initial, isNew, onSave, onCancel, t }: {
         </label>
         <label className={styles.field}>
           <span className={styles.label}>{t('template.permissionMode')}</span>
-          <select value={draft.permissionMode} onChange={(e) => set({ permissionMode: e.target.value as Tmpl['permissionMode'] })}>
+          <select
+            value={draft.permissionMode}
+            onChange={(e) => {
+              const mode = e.target.value as Tmpl['permissionMode']
+              // Safety rule: a "full" permission template must stay disabled.
+              set({ permissionMode: mode, ...(mode === 'full' ? { enabled: false } : {}) })
+            }}
+          >
             <option value="readonly">readonly</option><option value="workspace">workspace</option><option value="full">full</option>
           </select>
         </label>
