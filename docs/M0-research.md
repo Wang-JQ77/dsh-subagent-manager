@@ -10,8 +10,8 @@
 
 | 项 | 结论 |
 |---|---|
-| DSH CLI | `0.1.1-rc.2`（shim：`C:/Users/Wangjq/AppData/Roaming/npm/dsh.ps1` → `@deepseek-ai/dsh/lib/bin.js`） |
-| web profile | `C:/Users/Wangjq/.dsh/profiles/web/`，`@nanmicoder/dsh-agent-teams@0.1.13` 已装入 bundle 列表 |
+| DSH CLI | `0.1.1-rc.2`（npm shim `dsh.ps1` → `@deepseek-ai/dsh/lib/bin.js`） |
+| web profile | `$DSH_HOME/profiles/web/`（即 `~/.dsh/profiles/web/`），`@nanmicoder/dsh-agent-teams@0.1.13` 已装入 bundle 列表 |
 | 框架包版本 | 所有 `@deepseek-ai/dsh-*` 内嵌在 CLI 包 `node_modules/@deepseek-ai/`，均 `0.1.1-rc.2`；`cordis@4.0.1`、`schemastery@3.18.1` |
 | **无独立 DSH checkout** | 用户目录无 `deepseek-harness` 源码 checkout。开发期「链到 DSH checkout」的等价物 = **链接到 CLI 包内嵌的框架 node_modules**（`.../@deepseek-ai/dsh/node_modules/@deepseek-ai/*`）。本机已用 junction 全部链接：`196` 个 `@deepseek-ai/*` + `186` 个裸依赖。 |
 | settings slot 契约 | 权威文件 = `dsh-client-ui-settings/lib/types/client/contract/slots.d.ts`（源码内嵌包）。**核实通过**：`settings.section` / `settings.plugins.tab` / `settings.general.item` / `settings.trigger` / `settings.header` / `settings.action` / `settings.close` / `settings.onboarding`。 |

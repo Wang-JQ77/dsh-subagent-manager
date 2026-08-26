@@ -1,11 +1,13 @@
 # dsh-subagent-manager
 
+![Node.js](https://img.shields.io/badge/node-%3E%3D22-blue) ![License: MIT](https://img.shields.io/badge/license-MIT-green) ![status](https://img.shields.io/badge/status-M0%E2%80%93M6%20(offline%20parts)-informational)
+
 Sub-agent template manager for DeepSeek Harness (DSH): create / edit / enable
 sub-agent templates, launch them as durable continuable children, and join
 templates into [dsh-agent-teams](https://github.com/NanmiCoder/dsh-agent-teams)
 as members (**template = member**).
 
-> 项目代号：`dsh-subagent-manager` · 状态：**M1 骨架完成**（host/client 双 program 编译通过）
+> 项目代号：`dsh-subagent-manager` · 状态：**M0–M6 可离线部分完成**（构建、单测、干净 profile 安装 dogfood、headless 启动 `apply()` 验证与修复均通过；仅剩 npm 发布）。
 > 来源计划：《dsh-agent-manager-合并计划》（2026-08-26）
 
 ---
@@ -48,10 +50,11 @@ src/
   event-types.ts      # 共享 type-only 事件类型（零运行时 import）
   client/
     index.tsx         # 注册 settings.section「子 Agent 管理」+ locale
-    SettingsPage.tsx  # 设置页（M1 占位）
+    SettingsPage.tsx  # 设置页（M3：列表/表单/启停/归档/导入导出 + 实例视图）
     locales.ts        # en/zh 字典
   css-modules.d.ts    # *.module.css 声明
 scripts/verify.mjs    # 构建产物校验（M6 扩展验证金字塔）
+test/                 # 单元测试（node --test，纯 registry/schema/roster 逻辑）
 docs/M0-research.md   # M0 调研结论
 ```
 
@@ -67,15 +70,23 @@ pnpm build       # tsc emit + tsdown client bundle
 pnpm verify      # 构建产物校验（M6 扩展）
 ```
 
-> `pnpm build` 的 `tsdown` 段需要 `pnpm i -D tsdown lightningcss`；当前环境仅验证到 `tsc` 双 program emit。
+> `pnpm build` 的 `tsdown` 段需 `pnpm i -D tsdown lightningcss`；本机已装（全局 + 链入 node_modules）并成功产出 `lib/client.js`。
 
-### 安装（发布后）到 profile
+### 安装到 profile（发布后 / GitHub）
+
+> 需要 DSH CLI `0.1.1-rc.2`（或同通道 `^0.1.1-rc.2`）。安装后重启目标 profile。
 
 ```sh
-dsh plugin --profile <name> add dsh-subagent-manager
+# npm registry
+npx -p @deepseek-ai/dsh dsh plugin --profile <name> add dsh-subagent-manager
+
+# GitHub (official recommended: 仓库提供自包含 prepare 构建，或提交完整最新 lib/)
+npx -p @deepseek-ai/dsh dsh plugin --profile <name> add gh:<your-org>/dsh-subagent-manager
 ```
 
-安装后重启该 profile。详见未来 README 的排查章节（npmmirror vs npmjs 混装、「下载成功但未安装」、最低 DSH 版本、卸载故事）。
+**安装故障排查**：npm registry 双源（npmmirror vs npmjs）混装可能导致「下载成功但未安装」；先清该 profile 的元数据缓存再重装，或改用本地路径 `add .`。GitHub 分发若包声明 `prepare`、且 pnpm ≥10 拦截 Git 依赖构建脚本，需在该 profile 的 `pnpm-workspace.yaml` 显式 `allowBuilds` 后重跑 `add`。
+
+**卸载**：先停运行中实例、导出模板 JSON；settings.yaml 命名空间数据保留，重装可恢复。
 
 ---
 
