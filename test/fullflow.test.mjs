@@ -1,10 +1,10 @@
 /**
- * dsh-subagent-manager 鈥?full-flow end-to-end test against the real service.
+ * dsh-subagent-manager 閳?full-flow end-to-end test against the real service.
  *
  * Drives the actual `SubagentManager` (built lib) with a mock cordis ctx and a
  * mock `ctx.subagents.startContinuable`, so the whole host flow runs without a
- * live LLM: seed defaults 鈫?CRUD 鈫?enable 鈫?launch 鈫?running 鈫?stop 鈫?archive
- * 鈫?duplicate 鈫?member params 鈫?roster text.
+ * live LLM: seed defaults 閳?CRUD 閳?enable 閳?launch 閳?running 閳?stop 閳?archive
+ * 閳?duplicate 閳?member params 閳?roster text.
  *
  * Run: `node --test test/fullflow.test.mjs`
  */
@@ -43,7 +43,7 @@ function mockCtx() {
 
 const cfg = { storage: 'auto', memberProvider: 'spawn', memberMaxDepth: 1, promptSectionOrder: 118 }
 
-test('full flow: seed 鈫?CRUD 鈫?enable 鈫?launch 鈫?running 鈫?stop 鈫?archive 鈫?duplicate 鈫?roster', async () => {
+test('full flow: seed 閳?CRUD 閳?enable 閳?launch 閳?running 閳?stop 閳?archive 閳?duplicate 閳?roster', async () => {
   const ctx = mockCtx()
   const svc = new SubagentManager(ctx, cfg, memoryStorage())
   await svc.ready()
@@ -59,7 +59,7 @@ test('full flow: seed 鈫?CRUD 鈫?enable 鈫?launch 鈫?running 鈫?stop 鈫?ar
   // 2. Create a custom template.
   const created = await svc.create({
     id: 'test-runner', name: 'runner', name: 'Test Runner', role: 'runs tests',
-    persona: 'You run tests and report failures.', provider: 'spawn',
+    provider: 'spawn',
     permissionMode: 'workspace', memberProvider: 'spawn', maxDepth: 1,
     enabled: false, tags: ['test'], schemaVersion: 1,
   })
@@ -74,7 +74,7 @@ test('full flow: seed 鈫?CRUD 鈫?enable 鈫?launch 鈫?running 鈫?stop 鈫?ar
   const enabled = await svc.setEnabled('code-reviewer', true)
   assert.equal(enabled.enabled, true)
 
-  // 5. Launch 鈫?durable continuable child via (mocked) startContinuable.
+  // 5. Launch 閳?durable continuable child via (mocked) startContinuable.
   const started = await svc.launch('code-reviewer', {
     prompt: [{ type: 'text', text: 'review this' }],
     parent: {},
@@ -82,7 +82,7 @@ test('full flow: seed 鈫?CRUD 鈫?enable 鈫?launch 鈫?running 鈫?stop 鈫?ar
   })
   assert.equal(started.childId, 'child-1')
   assert.equal(ctx.__started.length, 1)
-  assert.equal(ctx.__started[0].request.persona, 'You are a rigorous code reviewer. Focus on correctness, security, and clarity. Be concise and specific.')
+  assert.equal(ctx.__started[0].request.persona, 'Reviews code for correctness, security, and style. You are a rigorous code reviewer. Focus on correctness, security, and clarity. Be concise and specific.')
 
   // 6. Running view.
   const running = await svc.listRunning()
@@ -105,7 +105,7 @@ test('full flow: seed 鈫?CRUD 鈫?enable 鈫?launch 鈫?running 鈫?stop 鈫?ar
   // 10. member params for agent-teams (template = member).
   const member = svc.memberParams('code-reviewer')
   assert.equal(member.provider, 'spawn')
-  assert.equal(member.persona.includes('rigorous'), true)
+  assert.equal(member.persona.includes('rigorous'), true) // role now carries the merged persona
 
   // 11. Stop clears the running registry.
   await svc.stop('child-1')

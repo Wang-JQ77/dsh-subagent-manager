@@ -1,8 +1,8 @@
-﻿/**
- * dsh-subagent-manager 鈥?built-in example templates (seeded on first run).
+/**
+ * dsh-subagent-manager — built-in example templates (seeded on first run).
  *
  * A small, safe starter set: all disabled and readonly by default. The user
- * reviews them in Settings 鈫?Sub-agent Manager and enables the ones they want.
+ * reviews them in Settings → Sub-agent Manager and enables the ones they want.
  * These make the roster useful immediately and double as documentation of the
  * template shape.
  */
@@ -13,8 +13,7 @@ export function defaultTemplates(): SubagentTemplate[] {
     {
       id: 'code-reviewer',
       name: 'reviewer',
-      role: 'Reviews code for correctness, security, and style',
-      persona: 'You are a rigorous code reviewer. Focus on correctness, security, and clarity. Be concise and specific.',
+      role: 'Reviews code for correctness, security, and style. You are a rigorous code reviewer. Focus on correctness, security, and clarity. Be concise and specific.',
       provider: 'spawn',
       model: '',
       reasoningEffort: 'high',
@@ -30,8 +29,7 @@ export function defaultTemplates(): SubagentTemplate[] {
     {
       id: 'security-auditor',
       name: 'auditor',
-      role: 'Audits code and configuration for security vulnerabilities',
-      persona: 'You are a security auditor. Look for injection, authn/authz gaps, secrets handling, and supply-chain risks. Report severity.',
+      role: 'Audits code and configuration for security vulnerabilities. You are a security auditor. Look for injection, authn/authz gaps, secrets handling, and supply-chain risks. Report severity.',
       provider: 'spawn',
       model: '',
       reasoningEffort: 'high',
@@ -47,8 +45,7 @@ export function defaultTemplates(): SubagentTemplate[] {
     {
       id: 'doc-writer',
       name: 'writer',
-      role: 'Writes and improves technical documentation',
-      persona: 'You are a technical writer. Produce clear, well-structured, accurate documentation in the requested language.',
+      role: 'Writes and improves technical documentation. You are a technical writer. Produce clear, well-structured, accurate documentation in the requested language.',
       provider: 'spawn',
       model: '',
       reasoningEffort: 'medium',
@@ -63,4 +60,3 @@ export function defaultTemplates(): SubagentTemplate[] {
     },
   ]
 }
-

@@ -28,7 +28,6 @@ export interface SubagentTemplate {
   name: string
   role: string
   avatar?: string
-  persona?: string
   provider: string
   model?: string
   reasoningEffort?: string
@@ -48,10 +47,9 @@ export const SubagentTemplateSchema: z<SubagentTemplate> = z.object({
   name: z.string().required(),
   role: z.string().required(),
   avatar: z.string().default(''),
-  persona: z.string().default(''),
   provider: z.string().default('spawn'),
   model: z.string().default(''),
-  reasoningEffort: z.string().default(''),
+  reasoningEffort: z.string().default('medium'),
   permissionMode: PermissionModeSchema.default('readonly'),
   agentPreset: AgentPresetSchema.default('standard'),
   memberProvider: MemberProviderSchema.default('spawn'),

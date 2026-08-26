@@ -19,7 +19,6 @@ export interface Tmpl {
   id: string
   name: string
   role: string
-  persona?: string
   provider: string
   model?: string
   reasoningEffort?: string
@@ -70,8 +69,8 @@ async function write(action: string, payload: unknown, expectedRevision: number)
 
 function blank(): Tmpl {
   return {
-    id: '', name: '', role: '', persona: '', provider: 'spawn', model: '',
-    reasoningEffort: '', permissionMode: 'readonly', agentPreset: 'standard', memberProvider: 'spawn', maxDepth: 1,
+    id: '', name: '', role: '', provider: 'spawn', model: '',
+    reasoningEffort: 'medium', permissionMode: 'readonly', agentPreset: 'standard', memberProvider: 'spawn', maxDepth: 1,
     enabled: false, tags: [], description: '', schemaVersion: 1,
   }
 }
@@ -283,9 +282,9 @@ function TemplateForm({ initial, isNew, onSave, onCancel, t }: {
           <span className={styles.label}>{t('template.name')}</span>
           <input value={draft.name} onChange={(e) => set({ name: e.target.value })} />
         </label>
-        <label className={styles.field}>
+        <label className={styles.fieldFull}>
           <span className={styles.label}>{t('template.role')}</span>
-          <input value={draft.role} onChange={(e) => set({ role: e.target.value })} />
+          <textarea rows={3} value={draft.role} onChange={(e) => set({ role: e.target.value })} />
         </label>
         <label className={styles.field}>
           <span className={styles.label}>{t('template.provider')}</span>
@@ -326,10 +325,6 @@ function TemplateForm({ initial, isNew, onSave, onCancel, t }: {
         <label className={styles.field}>
           <span className={styles.label}>{t('template.tags')}</span>
           <input value={draft.tags.join(', ')} onChange={(e) => set({ tags: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })} />
-        </label>
-        <label className={styles.fieldFull}>
-          <span className={styles.label}>{t('template.persona')}</span>
-          <textarea rows={3} value={draft.persona ?? ''} onChange={(e) => set({ persona: e.target.value })} />
         </label>
         <label className={styles.fieldFull}>
           <span className={styles.label}>{t('template.description')}</span>

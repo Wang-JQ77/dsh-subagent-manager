@@ -1,5 +1,5 @@
 /**
- * dsh-subagent-manager 鈥?unit tests for the pure template registry + safety
+ * dsh-subagent-manager 閳?unit tests for the pure template registry + safety
  * policy (M2.5). Runs against the compiled `lib/` with Node's built-in test
  * runner, so no extra test framework is needed.
  *
@@ -30,7 +30,6 @@ function template(overrides = {}) {
     name: 'reviewer',
     name: 'Code Reviewer',
     role: 'reviews code for correctness and security',
-    persona: 'You are a rigorous reviewer.',
     provider: 'spawn',
     permissionMode: 'readonly',
     memberProvider: 'spawn',

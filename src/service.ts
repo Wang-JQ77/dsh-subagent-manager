@@ -149,7 +149,7 @@ export class SubagentManager extends Service {
       request: {
         prompt: options.prompt,
         parent: options.parent,
-        persona: snapshot.persona || undefined,
+        persona: snapshot.role,
         maxDepth: snapshot.maxDepth,
         agentOptions: snapshot.model ? { model: snapshot.model } : undefined,
       },
@@ -188,7 +188,7 @@ export class SubagentManager extends Service {
       templateId: t.id,
       provider: t.provider,
       model: t.model || undefined,
-      persona: t.persona || undefined,
+      persona: t.role || undefined,
       reasoningEffort: t.reasoningEffort || undefined,
       agentTeams: true,
     }
