@@ -18,6 +18,7 @@ const required = [
   'lib/types/index.d.ts',
   'lib/service.js',
   'lib/client/index.js',
+  'lib/client.js',
   'lib/types/client/index.d.ts',
 ]
 
