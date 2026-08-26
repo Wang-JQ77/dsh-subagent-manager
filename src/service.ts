@@ -22,6 +22,7 @@ import type {} from '@deepseek-ai/dsh-subagent'
 import type { ContinuableStartSpec, SubagentStartRequest } from '@deepseek-ai/dsh-subagent'
 import { createTemplateStorage, type TemplateStorage } from './storage.ts'
 import { TemplateRegistry, type RunningInstance } from './registry.ts'
+import { scopeAllows } from './schema.ts'
 import type { SubagentTemplate } from './schema.ts'
 
 /** Configuration for the subagent-manager plugin. */
@@ -139,6 +140,13 @@ export class SubagentManager extends Service {
    */
   async launch(templateId: string, options: LaunchOptions): Promise<LaunchResult> {
     const snapshot = this.registry.snapshotForLaunch(templateId)
+    // Project-scoped templates may only launch from a matching workspace.
+    const parentCwd = (options.parent as { session?: { header?: { cwd?: string } } })?.session?.header?.cwd
+    if (!scopeAllows(snapshot.scope, parentCwd)) {
+      throw new Error(
+        `template "${templateId}" is scoped to project "${(snapshot.scope ?? '').replace(/^project:/, '')}" and cannot launch from this workspace`,
+      )
+    }
     // Feature-detect via ctx.get (subagents is optional, deferred to first use).
     const subagents = this.ctx.get('subagents' as any) as { startContinuable: (spec: ContinuableStartSpec) => Promise<{ childId: string; messageId: string }> } | undefined
     if (!subagents?.startContinuable) throw new Error('ctx.subagents is not available; install dsh-subagent in this profile')

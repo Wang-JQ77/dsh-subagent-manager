@@ -116,4 +116,19 @@ test('full flow: seed 閳?CRUD 閳?enable 閳?launch 閳?running 閳?stop 閳?ar
   const roster = buildRosterText(await svc.list())
   assert.match(roster, /reviewer/)
   assert.match(roster, /agent_teams_add_member/)
+
+  // 13. Scope enforcement: a project-scoped template rejects outside its project.
+  const scoped = await svc.create({
+    id: 'proj-agent', name: 'proj-agent', role: 'works only in my-app',
+    provider: 'fork', permissionMode: 'readonly', memberProvider: 'fork', maxDepth: 1,
+    enabled: true, tags: [], scope: 'project:my-app', schemaVersion: 1,
+  })
+  await assert.rejects(
+    () => svc.launch('proj-agent', { prompt: [{ type: 'text', text: 'x' }], parent: {}, signal: new AbortController().signal }),
+    /scoped to project/,
+  )
+  const okParent = { session: { header: { cwd: 'C:/work/my-app/src' } } }
+  const scopedStarted = await svc.launch('proj-agent', { prompt: [{ type: 'text', text: 'x' }], parent: okParent, signal: new AbortController().signal })
+  assert.equal(scopedStarted.childId, 'child-2')
+  assert.equal(scoped.scope, 'project:my-app')
 })

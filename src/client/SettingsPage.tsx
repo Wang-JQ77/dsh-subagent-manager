@@ -29,6 +29,7 @@ export interface Tmpl {
   enabled: boolean
   tags: string[]
   description?: string
+  scope?: string
   schemaVersion: number
 }
 interface Running {
@@ -71,7 +72,7 @@ function blank(): Tmpl {
   return {
     id: '', name: '', role: '', provider: 'fork', model: '',
     reasoningEffort: 'medium', permissionMode: 'readonly', agentPreset: 'standard', memberProvider: 'fork', maxDepth: 1,
-    enabled: true, tags: [], description: '', schemaVersion: 1,
+    enabled: true, tags: [], description: '', scope: 'global', schemaVersion: 1,
   }
 }
 
@@ -209,6 +210,7 @@ export function SettingsPage({
               <div className={styles.cardMain}>
                 <strong>{tmpl.name}</strong> <code>{tmpl.id}</code>
                 <span className={styles.meta}> · {tmpl.role} · {tmpl.permissionMode} · {tmpl.model || tmpl.provider}</span>
+                {tmpl.scope && tmpl.scope !== 'global' && <span className={styles.scope}>{tmpl.scope.replace(/^project:/, '')}</span>}
               </div>
               <div className={styles.cardActions}>
                 <label className={styles.enable}>
@@ -333,6 +335,28 @@ function TemplateForm({ initial, isNew, onSave, onCancel, t }: {
           <span className={styles.label}>{t('template.tags')}</span>
           <input value={draft.tags.join(', ')} onChange={(e) => set({ tags: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })} />
         </label>
+        <label className={styles.field}>
+          <span className={styles.label}>{t('template.scope')}</span>
+          <select
+            value={(draft.scope ?? 'global') === 'global' ? 'global' : 'project'}
+            onChange={(e) => {
+              const kind = e.target.value
+              set({ scope: kind === 'global' ? 'global' : 'project:' })
+            }}
+          >
+            <option value="global">global</option><option value="project">project</option>
+          </select>
+        </label>
+        {(draft.scope ?? '').startsWith('project:') && (
+          <label className={styles.field}>
+            <span className={styles.label}>{t('template.scopeProject')}</span>
+            <input
+              value={(draft.scope ?? '').replace(/^project:/, '')}
+              onChange={(e) => set({ scope: `project:${e.target.value.trim()}` })}
+              placeholder="my-project"
+            />
+          </label>
+        )}
         <label className={styles.fieldFull}>
           <span className={styles.label}>{t('template.description')}</span>
           <textarea rows={2} value={draft.description ?? ''} onChange={(e) => set({ description: e.target.value })} />

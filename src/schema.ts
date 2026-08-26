@@ -38,6 +38,8 @@ export interface SubagentTemplate {
   enabled: boolean
   tags: string[]
   description?: string
+  /** 'global' (any project) or 'project:<id>' (only sessions whose cwd contains that path segment). */
+  scope?: string
   schemaVersion: number
 }
 
@@ -57,6 +59,7 @@ export const SubagentTemplateSchema: z<SubagentTemplate> = z.object({
   enabled: z.boolean().default(true),
   tags: z.array(z.string()).default([]),
   description: z.string().default(''),
+  scope: z.string().default('global'),
   schemaVersion: z.natural().default(1),
 })
 
@@ -81,10 +84,20 @@ export function assertValidId(id: string): void {
 }
 
 /**
- * Safety policy (hard requirement). Default is readonly; a `full` permission
- * template may not be enabled (the dangerous combo the plan rejects). Throws
- * with a human-readable reason on violation.
+ * Resolve whether a template with the given scope is usable from a parent whose
+ * cwd is `parentCwd`. `global` always passes; `project:<id>` requires the id to
+ * appear as one of the cwd's path segments.
  */
+export function scopeAllows(scope: string | undefined, parentCwd: string | undefined): boolean {
+  if (!scope || scope === 'global') return true
+  const prefix = 'project:'
+  if (!scope.startsWith(prefix)) return true // unknown scope: do not block
+  const projectId = scope.slice(prefix.length).trim()
+  if (projectId === '') return true
+  if (!parentCwd) return false
+  const segments = parentCwd.split(/[\\/]+/).filter(Boolean)
+  return segments.includes(projectId)
+}
 export function assertSafeTemplate(template: SubagentTemplate): void {
   assertValidId(template.id)
   if (template.permissionMode === 'full' && template.enabled) {

@@ -1,8 +1,8 @@
 /**
- * dsh-subagent-manager 閳?built-in example templates (seeded on first run).
+ * dsh-subagent-manager 闁?built-in example templates (seeded on first run).
  *
  * A small, safe starter set: all disabled and readonly by default. The user
- * reviews them in Settings 閳?Sub-agent Manager and enables the ones they want.
+ * reviews them in Settings 闁?Sub-agent Manager and enables the ones they want.
  * These make the roster useful immediately and double as documentation of the
  * template shape.
  */
@@ -22,6 +22,7 @@ export function defaultTemplates(): SubagentTemplate[] {
       memberProvider: 'fork',
       maxDepth: 1,
       enabled: true,
+      scope: 'global',
       tags: ['review', 'code'],
       description: 'A strict reviewer for PRs and patches.',
       schemaVersion: 1,
@@ -38,6 +39,7 @@ export function defaultTemplates(): SubagentTemplate[] {
       memberProvider: 'fork',
       maxDepth: 1,
       enabled: true,
+      scope: 'global',
       tags: ['security', 'audit'],
       description: 'Security-focused audit pass.',
       schemaVersion: 1,
@@ -54,6 +56,7 @@ export function defaultTemplates(): SubagentTemplate[] {
       memberProvider: 'fork',
       maxDepth: 1,
       enabled: true,
+      scope: 'global',
       tags: ['docs', 'writing'],
       description: 'Writes docs and READMEs (workspace write allowed).',
       schemaVersion: 1,

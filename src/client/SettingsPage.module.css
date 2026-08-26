@@ -131,6 +131,14 @@
   color: #ffcf5c;
 }
 
+.scope {
+  color: #7ecb8b;
+  font-size: 11px;
+  border: 1px solid rgba(126, 203, 139, 0.4);
+  border-radius: 6px;
+  padding: 1px 6px;
+}
+
 .form {
   border: 1px solid var(--border, rgba(255, 255, 255, 0.12));
   border-radius: 12px;

@@ -83,6 +83,7 @@ export function registerSubagentTemplateTools(ctx: Context, manager: SubagentMan
       max_depth: { type: 'integer', description: 'Delegation depth cap (default 1).' },
       enabled: { type: 'boolean', description: 'Whether new launches are allowed (default true).' },
       tags: { type: 'array', items: { type: 'string' }, description: 'Free-form tags for natural-language roster matching.' },
+      scope: { type: 'string', description: "Scope: 'global' (any project) or 'project:<id>' (only that project's sessions). Defaults to global." },
     },
     output: {
       schema: { type: 'object', additionalProperties: false, properties: {
@@ -103,6 +104,7 @@ export function registerSubagentTemplateTools(ctx: Context, manager: SubagentMan
         maxDepth: args.max_depth ?? 1,
         enabled: args.enabled ?? true,
         tags: args.tags ?? [],
+        scope: args.scope ?? 'global',
         schemaVersion: 1,
       })
       return { id: created.id, name: created.name, role: created.role, permission_mode: created.permissionMode, enabled: created.enabled }
