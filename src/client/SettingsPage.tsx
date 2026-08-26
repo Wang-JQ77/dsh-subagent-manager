@@ -52,14 +52,19 @@ async function readState(signal?: AbortSignal): Promise<State> {
   return (await res.json()) as State
 }
 
-async function write(action: string, payload: unknown, expectedRevision: number): Promise<void> {
+async function writeResult<T>(action: string, payload: unknown, expectedRevision: number): Promise<T | undefined> {
   const res = await fetch(STATE_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action, payload, expectedRevision }),
   })
-  const data = await res.json() as { error?: string; message?: string }
+  const data = await res.json() as { error?: string; message?: string; result?: T }
   if (!res.ok) throw new Error(data.message ?? data.error ?? `write failed: ${res.status}`)
+  return data.result
+}
+
+async function write(action: string, payload: unknown, expectedRevision: number): Promise<void> {
+  await writeResult<void>(action, payload, expectedRevision)
 }
 
 function blank(): Tmpl {
@@ -77,6 +82,7 @@ export function SettingsPage({
   const [state, setState] = useState<State>(EMPTY_STATE)
   const [editing, setEditing] = useState<Tmpl | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const inFlight = useRef(false)
 
   const refresh = async (): Promise<void> => {
@@ -136,6 +142,20 @@ export function SettingsPage({
     catch (err) { setError(err instanceof Error ? err.message : String(err)) }
   }
 
+  const joinTeam = async (id: string): Promise<void> => {
+    setError(null)
+    try {
+      const res = await writeResult<{ provider: string; model?: string; persona?: string }>('join_team', { id }, state.revision)
+      setNotice(res ? `Joined team params for ${id}: provider=${res.provider}, model=${res.model ?? 'default'}, persona=${res.persona ? 'set' : 'none'}. Create the team in a session via the agent-teams tools.` : 'ok')
+    } catch (err) { setError(err instanceof Error ? err.message : String(err)) }
+  }
+
+  const stopInstance = async (childId: string): Promise<void> => {
+    setError(null)
+    try { await write('stop', { childId }, state.revision); await refresh() }
+    catch (err) { setError(err instanceof Error ? err.message : String(err)) }
+  }
+
   const exportJson = (): void => {
     const blob = new Blob([JSON.stringify(state.templates, null, 2)], { type: 'application/json' })
     const url = window.URL.createObjectURL(blob)
@@ -177,6 +197,7 @@ export function SettingsPage({
       </header>
 
       {error && <p className="error">{error}</p>}
+      {notice && <p className="notice">{notice}</p>}
 
       {templates.length === 0 ? (
         <p>{t('template.empty')}</p>
@@ -192,6 +213,7 @@ export function SettingsPage({
               </label>
               <button onClick={() => setEditing(tmpl)}>{t('template.edit')}</button>
               <button onClick={() => void duplicate(tmpl.id)}>{t('template.duplicate')}</button>
+              <button onClick={() => void joinTeam(tmpl.id)}>{t('template.joinTeam')}</button>
               <button onClick={() => void remove(tmpl.id)}>{t('template.delete')}</button>
               {running.some((r) => r.templateId === tmpl.id) && <span className="running">●</span>}
             </li>
@@ -207,6 +229,20 @@ export function SettingsPage({
           onCancel={() => setEditing(null)}
           t={t}
         />
+      )}
+
+      {running.length > 0 && (
+        <section className="running">
+          <h3>{t('template.running')}</h3>
+          <ul>
+            {running.map((r) => (
+              <li key={r.childId}>
+                <code>{r.childId}</code> · {r.templateId} · {r.status}
+                <button onClick={() => void stopInstance(r.childId)}>{t('template.stop')}</button>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
     </section>
   )

@@ -30,6 +30,8 @@ export const en = {
   'template.save': 'Save',
   'template.cancel': 'Cancel',
   'template.joinTeam': 'Join a team',
+  'template.running': 'Running instances',
+  'template.stop': 'Stop',
 } as const
 
 export type SubAgentManagerLocaleKey = keyof typeof en
@@ -57,4 +59,6 @@ export const zh: Record<SubAgentManagerLocaleKey, string> = {
   'template.save': '保存',
   'template.cancel': '取消',
   'template.joinTeam': '加入团队',
+  'template.running': '运行中实例',
+  'template.stop': '停止',
 }

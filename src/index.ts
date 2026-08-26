@@ -124,6 +124,11 @@ async function dispatchAction(mgr: SubagentManager, action: string | undefined, 
       return { result: await mgr.archive(String(p.id)) }
     case 'duplicate':
       return { template: await mgr.duplicate(String(p.id), p.newId ? String(p.newId) : undefined) }
+    case 'join_team':
+      return { member: mgr.memberParams(String(p.id)) }
+    case 'stop':
+      await mgr.stop(String(p.id))
+      return { ok: true }
     default:
       throw new Error(`unknown action "${String(action)}"`)
   }

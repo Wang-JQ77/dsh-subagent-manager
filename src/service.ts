@@ -158,6 +158,24 @@ export class SubagentManager extends Service {
     return this.registry.getRevision()
   }
 
+  /**
+   * Format the agent-teams member params for a template (M4 template=member).
+   * Does not mutate state; team creation itself must be driven in a session via
+   * the agent-teams tools (the roster injection tells the captain how).
+   */
+  memberParams(templateId: string): { templateId: string; provider: string; model?: string; persona?: string; reasoningEffort?: string; agentTeams: boolean } {
+    const t = this.registry.get(templateId)
+    if (!t) throw new Error(`template "${templateId}" does not exist`)
+    return {
+      templateId: t.id,
+      provider: t.provider,
+      model: t.model || undefined,
+      persona: t.persona || undefined,
+      reasoningEffort: t.reasoningEffort || undefined,
+      agentTeams: true,
+    }
+  }
+
   private listRunningFor(templateId: string): RunningInstance[] {
     return [...this.running.values()].filter((r) => r.templateId === templateId)
   }
