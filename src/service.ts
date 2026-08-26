@@ -122,8 +122,9 @@ export class SubagentManager extends Service {
    */
   async launch(templateId: string, options: LaunchOptions): Promise<LaunchResult> {
     const snapshot = this.registry.snapshotForLaunch(templateId)
-    const subagents = this.ctx.subagents
-    if (!subagents) throw new Error('ctx.subagents is not available; install dsh-subagent in this profile')
+    // Feature-detect via ctx.get (subagents is optional, deferred to first use).
+    const subagents = this.ctx.get('subagents' as any) as { startContinuable: (spec: ContinuableStartSpec) => Promise<{ childId: string; messageId: string }> } | undefined
+    if (!subagents?.startContinuable) throw new Error('ctx.subagents is not available; install dsh-subagent in this profile')
 
     const spec: ContinuableStartSpec = {
       provider: snapshot.provider,

@@ -66,7 +66,9 @@ export class MemoryTemplateStorage implements TemplateStorage {
  * is absent, logs a loud warning and returns the in-memory adapter.
  */
 export function createTemplateStorage(ctx: Context, logger?: { warn?: (msg: string) => void }): TemplateStorage {
-  const settings = (ctx as unknown as { settings?: SettingsProvider }).settings
+  // Feature-detect via ctx.get (NOT direct property access, which throws unless
+  // the service is in `inject`).
+  const settings = ctx.get('settings' as any) as SettingsProvider | undefined
   if (settings?.register) {
     return new SettingsTemplateStorage(settings)
   }
