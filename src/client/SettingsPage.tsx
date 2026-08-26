@@ -310,9 +310,8 @@ function TemplateForm({ initial, isNew, currentProject, onSave, onCancel, t }: {
   }
   const field = (label: string, hint: string, control: React.ReactNode, full = false): React.ReactNode => (
     <label className={full ? styles.fieldFull : styles.field}>
-      <span className={styles.label}>{label}</span>
+      <span className={styles.label}>{label} <span className={styles.hintInline}>{hint}</span></span>
       {control}
-      <span className={styles.hint}>{hint}</span>
     </label>
   )
   return (
