@@ -1,8 +1,8 @@
 /**
- * dsh-subagent-manager 闁?built-in example templates (seeded on first run).
+ * dsh-subagent-manager 闂?built-in example templates (seeded on first run).
  *
  * A small, safe starter set: all disabled and readonly by default. The user
- * reviews them in Settings 闁?Sub-agent Manager and enables the ones they want.
+ * reviews them in Settings 闂?Sub-agent Manager and enables the ones they want.
  * These make the roster useful immediately and double as documentation of the
  * template shape.
  */
@@ -13,6 +13,7 @@ export function defaultTemplates(): SubagentTemplate[] {
     {
       id: 'code-reviewer',
       name: 'reviewer',
+      label: 'Code Reviewer',
       role: 'Reviews code for correctness, security, and style. You are a rigorous code reviewer. Focus on correctness, security, and clarity. Be concise and specific.',
       provider: 'fork',
       model: '',
@@ -30,6 +31,7 @@ export function defaultTemplates(): SubagentTemplate[] {
     {
       id: 'security-auditor',
       name: 'auditor',
+      label: 'Security Auditor',
       role: 'Audits code and configuration for security vulnerabilities. You are a security auditor. Look for injection, authn/authz gaps, secrets handling, and supply-chain risks. Report severity.',
       provider: 'fork',
       model: '',
@@ -47,6 +49,7 @@ export function defaultTemplates(): SubagentTemplate[] {
     {
       id: 'doc-writer',
       name: 'writer',
+      label: 'Doc Writer',
       role: 'Writes and improves technical documentation. You are a technical writer. Produce clear, well-structured, accurate documentation in the requested language.',
       provider: 'fork',
       model: '',

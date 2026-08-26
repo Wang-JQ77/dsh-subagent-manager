@@ -1,10 +1,10 @@
 /**
- * dsh-subagent-manager 閳?full-flow end-to-end test against the real service.
+ * dsh-subagent-manager 闁?full-flow end-to-end test against the real service.
  *
  * Drives the actual `SubagentManager` (built lib) with a mock cordis ctx and a
  * mock `ctx.subagents.startContinuable`, so the whole host flow runs without a
- * live LLM: seed defaults 閳?CRUD 閳?enable 閳?launch 閳?running 閳?stop 閳?archive
- * 閳?duplicate 閳?member params 閳?roster text.
+ * live LLM: seed defaults 闁?CRUD 闁?enable 闁?launch 闁?running 闁?stop 闁?archive
+ * 闁?duplicate 闁?member params 闁?roster text.
  *
  * Run: `node --test test/fullflow.test.mjs`
  */
@@ -43,7 +43,7 @@ function mockCtx() {
 
 const cfg = { storage: 'auto', memberProvider: 'spawn', memberMaxDepth: 1, promptSectionOrder: 118 }
 
-test('full flow: seed 閳?CRUD 閳?enable 閳?launch 閳?running 閳?stop 閳?archive 閳?duplicate 閳?roster', async () => {
+test('full flow: seed 闁?CRUD 闁?enable 闁?launch 闁?running 闁?stop 闁?archive 闁?duplicate 闁?roster', async () => {
   const ctx = mockCtx()
   const svc = new SubagentManager(ctx, cfg, memoryStorage())
   await svc.ready()
@@ -58,7 +58,8 @@ test('full flow: seed 閳?CRUD 閳?enable 閳?launch 閳?running 閳?stop 閳?ar
 
   // 2. Create a custom template.
   const created = await svc.create({
-    id: 'test-runner', name: 'runner', name: 'Test Runner', role: 'runs tests',
+    id: 'test-runner', name: 'runner', name: 'Test Runner',
+        label: 'Test Runner', role: 'runs tests',
     provider: 'spawn',
     permissionMode: 'workspace', memberProvider: 'spawn', maxDepth: 1,
     enabled: false, tags: ['test'], schemaVersion: 1,
@@ -67,14 +68,14 @@ test('full flow: seed 閳?CRUD 閳?enable 閳?launch 閳?running 閳?stop 閳?ar
   assert.equal((await svc.list()).length, 4)
 
   // 3. Update name.
-  const updated = await svc.update('test-runner', { name: 'Test Runner v2' })
-  assert.equal(updated.name, 'Test Runner v2')
+  const updated = await svc.update('test-runner', { label: 'Test Runner v2' })
+  assert.equal(updated.label, 'Test Runner v2')
 
   // 4. Enable a template (readonly is safe).
   const enabled = await svc.setEnabled('code-reviewer', true)
   assert.equal(enabled.enabled, true)
 
-  // 5. Launch 閳?durable continuable child via (mocked) startContinuable.
+  // 5. Launch 闁?durable continuable child via (mocked) startContinuable.
   const started = await svc.launch('code-reviewer', {
     prompt: [{ type: 'text', text: 'review this' }],
     parent: {},
@@ -92,7 +93,7 @@ test('full flow: seed 閳?CRUD 閳?enable 閳?launch 閳?running 閳?stop 閳?ar
   // 7. Launch a disabled template rejects; full+enabled rejects.
   await svc.setEnabled('security-auditor', false)
   await assert.rejects(() => svc.launch('security-auditor', { prompt: [{ type: 'text', text: 'x' }], parent: {}, signal: new AbortController().signal }), /disabled/)
-  await assert.rejects(() => svc.create({ id: 'danger', name: 'D', role: 'r', permissionMode: 'full', enabled: true, memberProvider: 'spawn', provider: 'spawn', tags: [], schemaVersion: 1 }), /full.*enabled/)
+  await assert.rejects(() => svc.create({ id: 'danger', name: 'D', label: 'D', role: 'r', permissionMode: 'full', enabled: true, memberProvider: 'spawn', provider: 'spawn', tags: [], schemaVersion: 1 }), /full.*enabled/)
 
   // 8. Archive removes; running instance unaffected by archive of a different template.
   await svc.archive('security-auditor')
@@ -119,7 +120,7 @@ test('full flow: seed 閳?CRUD 閳?enable 閳?launch 閳?running 閳?stop 閳?ar
 
   // 13. Scope enforcement: a project-scoped template rejects outside its project.
   const scoped = await svc.create({
-    id: 'proj-agent', name: 'proj-agent', role: 'works only in my-app',
+    id: 'proj-agent', name: 'proj-agent', label: 'proj-agent', role: 'works only in my-app',
     provider: 'fork', permissionMode: 'readonly', memberProvider: 'fork', maxDepth: 1,
     enabled: true, tags: [], scope: 'project:my-app', schemaVersion: 1,
   })

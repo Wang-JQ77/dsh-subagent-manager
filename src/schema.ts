@@ -26,6 +26,9 @@ export const MemberProviderSchema = z.union([z.const('spawn'), z.const('fork')])
 export interface SubagentTemplate {
   id: string
   name: string
+  /** Display / roster name (shown in UI lists and the system-prompt roster). */
+  label: string
+  /** Role description + persona (used as the sub-agent's persona on launch). */
   role: string
   avatar?: string
   provider: string
@@ -47,6 +50,7 @@ export interface SubagentTemplate {
 export const SubagentTemplateSchema: z<SubagentTemplate> = z.object({
   id: z.string().required(),
   name: z.string().required(),
+  label: z.string().required(),
   role: z.string().required(),
   avatar: z.string().default(''),
   provider: z.string().default('fork'),
@@ -105,7 +109,7 @@ export function assertSafeTemplate(template: SubagentTemplate): void {
       `template "${template.id}": "full" permission may not be enabled (readonly is the safe default; disable before enabling)`,
     )
   }
-  if (template.name.trim() === '' || template.role.trim() === '') {
-    throw new Error(`template "${template.id}": name and role must not be empty`)
+  if (template.name.trim() === '' || template.label.trim() === '' || template.role.trim() === '') {
+    throw new Error(`template "${template.id}": name, label and role must not be empty`)
   }
 }

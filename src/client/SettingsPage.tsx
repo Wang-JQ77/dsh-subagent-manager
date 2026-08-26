@@ -22,6 +22,7 @@ export interface SettingsPageProps {
 export interface Tmpl {
   id: string
   name: string
+  label: string
   role: string
   provider: string
   model?: string
@@ -74,7 +75,7 @@ async function write(action: string, payload: unknown, expectedRevision: number)
 
 function blank(): Tmpl {
   return {
-    id: '', name: '', role: '', provider: 'fork', model: '',
+    id: '', name: '', label: '', role: '', provider: 'fork', model: '',
     reasoningEffort: 'medium', permissionMode: 'readonly', agentPreset: 'standard', memberProvider: 'fork', maxDepth: 1,
     enabled: true, tags: [], description: '', scope: 'global', schemaVersion: 1,
   }
@@ -162,7 +163,9 @@ export function SettingsPage({
     setError(null)
     try {
       const res = await writeResult<{ provider: string; model?: string; persona?: string }>('join_team', { id }, state.revision)
-      setNotice(res ? `Joined team params for ${id}: provider=${res.provider}, model=${res.model ?? 'default'}, persona=${res.persona ? 'set' : 'none'}. Create the team in a session via the agent-teams tools.` : 'ok')
+      setNotice(res
+        ? `已生成成员参数（${id}）：provider=${res.provider}, model=${res.model ?? '默认'}, persona=${res.persona ? '已设置' : '无'}。真正加入/退出团队需在会话内让模型调用 agent_teams_create / agent_teams_add_member / agent_teams_remove_member 完成——本按钮只生成参数，不会自动建队。`
+        : 'ok')
     } catch (err) { setError(err instanceof Error ? err.message : String(err)) }
   }
 
@@ -236,7 +239,7 @@ export function SettingsPage({
               {visibleTemplates.map((tmpl) => (
                 <li key={tmpl.id} className={styles.card}>
                   <div className={styles.cardMain}>
-                    <strong>{tmpl.name}</strong> <code>{tmpl.id}</code>
+                    <strong>{tmpl.label}</strong> <code>{tmpl.id}</code>
                     <span className={styles.meta}> · {tmpl.role} · {tmpl.permissionMode} · {tmpl.model || tmpl.provider}</span>
                     {tmpl.scope && tmpl.scope !== 'global' && <span className={styles.scope}>{tmpl.scope.replace(/^project:/, '')}</span>}
                   </div>
@@ -262,6 +265,7 @@ export function SettingsPage({
         <TemplateForm
           isNew={!state.templates.some((x) => x.id === editing.id)}
           initial={editing}
+          currentProject={currentSegments.length ? currentSegments.join('/') : undefined}
           onSave={save}
           onCancel={() => setEditing(null)}
           t={t}
@@ -289,9 +293,10 @@ export function SettingsPage({
 
 type T = (key: keyof typeof import('./locales.ts')['en']) => string
 
-function TemplateForm({ initial, isNew, onSave, onCancel, t }: {
+function TemplateForm({ initial, isNew, currentProject, onSave, onCancel, t }: {
   initial: Tmpl
   isNew: boolean
+  currentProject?: string
   onSave: (tmpl: Tmpl) => Promise<void>
   onCancel: () => void
   t: T
@@ -303,37 +308,42 @@ function TemplateForm({ initial, isNew, onSave, onCancel, t }: {
   const setId = (id: string): void => {
     setDraft((d) => ({ ...d, id, ...(isNew && (d.name === '' || d.name === d.id) ? { name: id } : {}) }))
   }
+  const field = (label: string, hint: string, control: React.ReactNode, full = false): React.ReactNode => (
+    <label className={full ? styles.fieldFull : styles.field}>
+      <span className={styles.label}>{label}</span>
+      {control}
+      <span className={styles.hint}>{hint}</span>
+    </label>
+  )
   return (
     <form className={styles.form} onSubmit={submit}>
       <div className={styles.formGrid}>
-        <label className={styles.field}>
-          <span className={styles.label}>{t('template.id')}</span>
+        {field(t('template.id'), t('template.hint.id'), (
           <input value={draft.id} disabled={!isNew} onChange={(e) => setId(e.target.value)} />
-        </label>
-        <label className={styles.field}>
-          <span className={styles.label}>{t('template.name')}</span>
+        ))}
+        {field(t('template.name'), t('template.hint.name'), (
           <input value={draft.name} onChange={(e) => set({ name: e.target.value })} />
-        </label>
-        <label className={styles.fieldFull}>
-          <span className={styles.label}>{t('template.role')}</span>
+        ))}
+        {field(t('template.label'), t('template.hint.label'), (
+          <input value={draft.label} onChange={(e) => set({ label: e.target.value })} />
+        ))}
+        {field(t('template.role'), t('template.hint.role'), (
           <textarea rows={3} value={draft.role} onChange={(e) => set({ role: e.target.value })} />
-        </label>
-        <label className={styles.field}>
-          <span className={styles.label}>{t('template.provider')}</span>
-          <input value={draft.provider} onChange={(e) => set({ provider: e.target.value })} />
-        </label>
-        <label className={styles.field}>
-          <span className={styles.label}>{t('template.model')}</span>
-          <input value={draft.model ?? ''} onChange={(e) => set({ model: e.target.value })} />
-        </label>
-        <label className={styles.field}>
-          <span className={styles.label}>{t('template.reasoningEffort')}</span>
-          <select value={draft.reasoningEffort ?? ''} onChange={(e) => set({ reasoningEffort: e.target.value })}>
-            <option value="">default</option><option value="low">low</option><option value="medium">medium</option><option value="high">high</option>
+        ), true)}
+        {field(t('template.provider'), t('template.hint.provider'), (
+          <select value={draft.provider} onChange={(e) => set({ provider: e.target.value })}>
+            <option value="fork">fork</option><option value="spawn">spawn</option>
           </select>
-        </label>
-        <label className={styles.field}>
-          <span className={styles.label}>{t('template.permissionMode')}</span>
+        ))}
+        {field(t('template.model'), t('template.hint.model'), (
+          <input value={draft.model ?? ''} onChange={(e) => set({ model: e.target.value })} />
+        ))}
+        {field(t('template.reasoningEffort'), t('template.hint.reasoningEffort'), (
+          <select value={draft.reasoningEffort ?? 'medium'} onChange={(e) => set({ reasoningEffort: e.target.value })}>
+            <option value="low">low</option><option value="medium">medium</option><option value="high">high</option>
+          </select>
+        ))}
+        {field(t('template.permissionMode'), t('template.hint.permissionMode'), (
           <select
             value={draft.permissionMode}
             onChange={(e) => {
@@ -344,29 +354,24 @@ function TemplateForm({ initial, isNew, onSave, onCancel, t }: {
           >
             <option value="readonly">readonly</option><option value="workspace">workspace</option><option value="full">full</option>
           </select>
-        </label>
-        <label className={styles.field}>
-          <span className={styles.label}>{t('template.memberProvider')}</span>
+        ))}
+        {field(t('template.memberProvider'), t('template.hint.memberProvider'), (
           <select value={draft.memberProvider} onChange={(e) => set({ memberProvider: e.target.value as Tmpl['memberProvider'] })}>
-            <option value="spawn">spawn</option><option value="fork">fork</option>
+            <option value="fork">fork</option><option value="spawn">spawn</option>
           </select>
-        </label>
-        <label className={styles.field}>
-          <span className={styles.label}>{t('template.agentPreset')}</span>
+        ))}
+        {field(t('template.agentPreset'), t('template.hint.agentPreset'), (
           <select value={draft.agentPreset ?? 'standard'} onChange={(e) => set({ agentPreset: e.target.value as Tmpl['agentPreset'] })}>
             <option value="standard">standard</option><option value="code">code</option><option value="minimal">minimal</option><option value="creator">creator</option>
           </select>
-        </label>
-        <label className={styles.field}>
-          <span className={styles.label}>{t('template.maxDepth')}</span>
+        ))}
+        {field(t('template.maxDepth'), t('template.hint.maxDepth'), (
           <input type="number" min={0} value={draft.maxDepth ?? 1} onChange={(e) => set({ maxDepth: Number(e.target.value) })} />
-        </label>
-        <label className={styles.field}>
-          <span className={styles.label}>{t('template.tags')}</span>
+        ))}
+        {field(t('template.tags'), t('template.hint.tags'), (
           <input value={draft.tags.join(', ')} onChange={(e) => set({ tags: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })} />
-        </label>
-        <label className={styles.field}>
-          <span className={styles.label}>{t('template.scope')}</span>
+        ))}
+        {field(t('template.scope'), t('template.hint.scope'), (
           <select
             value={(draft.scope ?? 'global') === 'global' ? 'global' : 'project'}
             onChange={(e) => {
@@ -376,22 +381,22 @@ function TemplateForm({ initial, isNew, onSave, onCancel, t }: {
           >
             <option value="global">global</option><option value="project">project</option>
           </select>
-        </label>
-        {(draft.scope ?? '').startsWith('project:') && (
-          <label className={styles.field}>
-            <span className={styles.label}>{t('template.scopeProject')}</span>
-            <input
-              value={(draft.scope ?? '').replace(/^project:/, '')}
-              onChange={(e) => set({ scope: `project:${e.target.value.trim()}` })}
-              placeholder="my-project"
-            />
-          </label>
-        )}
-        <label className={styles.fieldFull}>
-          <span className={styles.label}>{t('template.description')}</span>
+        ))}
+        {(draft.scope ?? '').startsWith('project:') && field(t('template.scopeProject'), t('template.hint.scopeProject'), (
+          <input
+            value={(draft.scope ?? '').replace(/^project:/, '')}
+            onChange={(e) => set({ scope: `project:${e.target.value.trim()}` })}
+            placeholder="my-project"
+          />
+        ))}
+        {field(t('template.description'), t('template.hint.description'), (
           <textarea rows={2} value={draft.description ?? ''} onChange={(e) => set({ description: e.target.value })} />
-        </label>
+        ), true)}
       </div>
+
+      {currentProject && (
+        <p className={styles.hint}>{t('template.currentProject').replace('{p}', currentProject)}</p>
+      )}
 
       <div className={styles.formFooter}>
         <label className={styles.enable}>

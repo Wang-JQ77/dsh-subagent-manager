@@ -19,6 +19,7 @@ export interface ListOutput {
 export interface CreateOutput {
   id: string
   name: string
+  label: string
   role: string
   permission_mode: string
   enabled: boolean
@@ -70,11 +71,12 @@ export function registerSubagentTemplateTools(ctx: Context, manager: SubagentMan
 
   const createTool = defineTool({
     name: 'subagent_template_create',
-    description: 'Create a sub-agent template from a named recipe. Provide a kebab-case id, a role, and optionally a name (defaults to the id), model, provider (defaults fork), permission mode (readonly|workspace|full: defaults readonly), max depth, and tags. New templates default to enabled=true; a "full" permission template must be created with enabled=false.',
+    description: 'Create a sub-agent template from a named recipe. Provide a kebab-case id, a display label, a role (description + persona), and optionally a name (defaults to the id), model, provider (defaults fork), permission mode (readonly|workspace|full: defaults readonly), max depth, and tags. New templates default to enabled=true; a "full" permission template must be created with enabled=false.',
     parameters: {
       id: { type: 'string', required: true, description: 'Kebab-case stable template id.' },
       name: { type: 'string', description: 'Member name; defaults to the template id.' },
-      role: { type: 'string', required: true, description: 'One-line role this sub-agent plays (used as its persona too).' },
+      label: { type: 'string', required: true, description: 'Display / roster name shown in the UI.' },
+      role: { type: 'string', required: true, description: 'Role description + persona (used as the sub-agent persona).' },
       provider: { type: 'string', enum: ['spawn', 'fork'], description: "Subagent provider; defaults to fork." },
       model: { type: 'string', description: 'Optional model override.' },
       reasoning_effort: { type: 'string', enum: ['low', 'medium', 'high'], description: 'Reasoning effort; defaults to medium.' },
@@ -87,14 +89,15 @@ export function registerSubagentTemplateTools(ctx: Context, manager: SubagentMan
     },
     output: {
       schema: { type: 'object', additionalProperties: false, properties: {
-        id: { type: 'string', required: true }, name: { type: 'string', required: true }, role: { type: 'string', required: true }, permission_mode: { type: 'string', required: true }, enabled: { type: 'boolean', required: true },
+        id: { type: 'string', required: true }, name: { type: 'string', required: true }, label: { type: 'string', required: true }, role: { type: 'string', required: true }, permission_mode: { type: 'string', required: true }, enabled: { type: 'boolean', required: true },
       } },
-      render: (_args: unknown, value: CreateOutput) => text(`Template "${value.id}" created (${value.name}, ${value.permission_mode}, enabled=${value.enabled}).`),
+      render: (_args: unknown, value: CreateOutput) => text(`Template "${value.id}" created (${value.label}, ${value.permission_mode}, enabled=${value.enabled}).`),
     },
     execute: async (args) => {
       const created = await manager.create({
         id: args.id.trim(),
         name: (args.name ?? args.id).trim(),
+        label: args.label.trim(),
         role: args.role.trim(),
         provider: args.provider ?? 'fork',
         model: args.model,
@@ -107,7 +110,7 @@ export function registerSubagentTemplateTools(ctx: Context, manager: SubagentMan
         scope: args.scope ?? 'global',
         schemaVersion: 1,
       })
-      return { id: created.id, name: created.name, role: created.role, permission_mode: created.permissionMode, enabled: created.enabled }
+      return { id: created.id, name: created.name, label: created.label, role: created.role, permission_mode: created.permissionMode, enabled: created.enabled }
     },
   })
   dispose.push(ctx.tools.register(createTool))

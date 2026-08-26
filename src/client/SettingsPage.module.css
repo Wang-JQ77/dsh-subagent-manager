@@ -170,6 +170,12 @@
   margin-bottom: 2px;
 }
 
+.hint {
+  font-size: 11px;
+  color: var(--text-3, #808080);
+  line-height: 1.4;
+}
+
 .field input,
 .field select,
 .fieldFull textarea {

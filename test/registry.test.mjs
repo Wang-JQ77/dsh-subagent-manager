@@ -1,5 +1,5 @@
 /**
- * dsh-subagent-manager 閳?unit tests for the pure template registry + safety
+ * dsh-subagent-manager 闁?unit tests for the pure template registry + safety
  * policy (M2.5). Runs against the compiled `lib/` with Node's built-in test
  * runner, so no extra test framework is needed.
  *
@@ -28,7 +28,7 @@ function template(overrides = {}) {
   return {
     id: 'code-reviewer',
     name: 'reviewer',
-    name: 'Code Reviewer',
+    label: 'Code Reviewer',
     role: 'reviews code for correctness and security',
     provider: 'spawn',
     permissionMode: 'readonly',
@@ -46,7 +46,7 @@ test('create + list roundtrip', async () => {
   await reg.init()
   await reg.create(template())
   assert.equal(reg.list().length, 1)
-  assert.equal(reg.get('code-reviewer').name, 'Code Reviewer')
+  assert.equal(reg.get('code-reviewer').label, 'Code Reviewer')
   assert.equal(reg.get('missing'), undefined)
 })
 
@@ -71,9 +71,10 @@ test('create rejects dangerous combo end-to-end', async () => {
   )
 })
 
-test('blank name/role is rejected', () => {
-  assert.throws(() => assertSafeTemplate(template({ name: '' })), /name and role/)
-  assert.throws(() => assertSafeTemplate(template({ role: '  ' })), /name and role/)
+test('blank name/label/role is rejected', () => {
+  assert.throws(() => assertSafeTemplate(template({ name: '' })), /name, label and role/)
+  assert.throws(() => assertSafeTemplate(template({ role: '  ' })), /name, label and role/)
+  assert.throws(() => assertSafeTemplate(template({ label: '' })), /name, label and role/)
 })
 
 test('invalid id rejected', () => {
@@ -88,7 +89,7 @@ test('disable blocks launch; running unaffected by edit', async () => {
   assert.throws(() => reg.snapshotForLaunch('code-reviewer'), /disabled/)
   await reg.setEnabled('code-reviewer', true)
   const snap = reg.snapshotForLaunch('code-reviewer')
-  assert.equal(snap.name, 'Code Reviewer')
+  assert.equal(snap.label, 'Code Reviewer')
 })
 
 test('edit snapshot: update does not mutate the launch snapshot', async () => {
@@ -96,9 +97,9 @@ test('edit snapshot: update does not mutate the launch snapshot', async () => {
   await reg.init()
   await reg.create(template({ enabled: true }))
   const before = reg.snapshotForLaunch('code-reviewer')
-  await reg.update('code-reviewer', { name: 'Changed Label' })
-  assert.equal(before.name, 'Code Reviewer')
-  assert.equal(reg.get('code-reviewer').name, 'Changed Label')
+  await reg.update('code-reviewer', { label: 'Changed Label' })
+  assert.equal(before.label, 'Code Reviewer')
+  assert.equal(reg.get('code-reviewer').label, 'Changed Label')
 })
 
 test('archive disables and removes; duplicate creates disabled copy', async () => {
@@ -125,8 +126,8 @@ test('persistence writes through the storage adapter', async () => {
 import { buildRosterText } from '../lib/roster.js'
 test('roster text: disabled templates are excluded and fields are listed', () => {
   const text = buildRosterText([
-    template({ id: 'code-reviewer', name: 'Code Reviewer', enabled: true, provider: 'spawn' }),
-    template({ id: 'auditor', name: 'Security Auditor', enabled: false }),
+    template({ id: 'code-reviewer', label: 'Code Reviewer', enabled: true, provider: 'spawn' }),
+    template({ id: 'auditor', label: 'Security Auditor', enabled: false }),
   ])
   assert.match(text, /Code Reviewer/)
   assert.doesNotMatch(text, /Security Auditor/)

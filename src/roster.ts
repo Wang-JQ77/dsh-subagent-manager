@@ -15,7 +15,7 @@ export function buildRosterText(templates: readonly SubagentTemplate[]): string 
   const lines = enabled.map((t) => {
     const model = t.model?.trim() ? `, model="${t.model.trim()}"` : ''
     const depth = typeof t.maxDepth === 'number' ? `, maxDepth=${t.maxDepth}` : ''
-    return `- ${t.name} (id ${t.id}): provider=${t.provider}, role="${t.role}", permissionMode=${t.permissionMode}, memberProvider=${t.memberProvider}${model}${depth}`
+    return `- ${t.label} (id ${t.id}): provider=${t.provider}, role="${t.role}", permissionMode=${t.permissionMode}, memberProvider=${t.memberProvider}${model}${depth}`
   })
   return [
     '[subagent-manager] Enabled sub-agent templates (use them as AgentTeams members):',
