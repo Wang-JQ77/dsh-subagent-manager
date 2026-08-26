@@ -27,7 +27,7 @@ as members (**template = member**).
 | M1 骨架 | ✅ 完成 | `tsc -p tsconfig.json` 与 `tsc -p tsconfig.client.json` 均编译通过；`lib/` 产物生成。 |
 | M2 服务层 | ✅ 完成 | 模板 schema + 安全策略、持久化（settings 命名空间 / 内存兑底）、CRUD + enable + 生命周期、`subagent_template_*` 工具、10 项单测全绿。 |
 | M3 设置页 | ✅ 编译通过 | host GET/POST `/plugins/subagent-manager/state` 路由 + 冲突版本；client `settings.section` 设置页（列表/表单/启停/归档/导入导出）+ 轮询/焦点刷新 + i18n。GUI 渲染待 M6。 |
-| M4 agent-teams 打通 | ⏳ 待做 | 模板即成员 + 独立子 agent + systemPrompt 名册注入。 |
+| M4 agent-teams 打通 | 🔶 部分 | **systemPrompt 名册注入已实现**（`subagent-manager:roster` section，纯外挂式，单测+编译通过）。「模板即成员一键加团队」与 agent-teams 运行时联动待做（需 live agent-teams + 会话验证）。 |
 | M5 实例视图 + 健壮性 | ⏳ 待做 | 运行实例视图 + 无障碍/竞态/清理 checklist。 |
 | M6 验证 + 发布 | ⏳ 待做 | 验证金字塔 + npm 发布后干净 profile dogfood（失败不得发布）。 |
 

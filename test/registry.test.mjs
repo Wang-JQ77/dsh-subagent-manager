@@ -119,3 +119,14 @@ test('persistence writes through the storage adapter', async () => {
   await reg.create(template())
   assert.equal(store.dump().templates.length, 1)
 })
+
+import { buildRosterText } from '../lib/roster.js'
+test('roster text: disabled templates are excluded and fields are listed', () => {
+  const text = buildRosterText([
+    template({ id: 'code-reviewer', label: 'Code Reviewer', enabled: true, provider: 'spawn' }),
+    template({ id: 'auditor', label: 'Security Auditor', enabled: false }),
+  ])
+  assert.match(text, /Code Reviewer/)
+  assert.doesNotMatch(text, /Security Auditor/)
+  assert.match(text, /provider=spawn/)
+})

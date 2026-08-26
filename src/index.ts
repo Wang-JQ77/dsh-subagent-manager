@@ -18,6 +18,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { SubagentManager, type SubagentManagerConfig } from './service.ts'
 import { SubagentManagerConfig as ConfigSchema } from './service.ts'
 import { registerSubagentTemplateTools } from './tools.ts'
+import { buildRosterText } from './roster.ts'
 import type { SubagentTemplate } from './schema.ts'
 
 /**
@@ -37,7 +38,7 @@ interface WebRouteHost {
 const WEB_SERVER_KEYS = ['webServer', 'httpServer'] as const
 
 export const name = 'subagent-manager'
-export const inject = ['tools']
+export const inject = ['tools', 'systemPrompt']
 
 /** Plugin configuration (delegates to the service config schema). */
 export type Config = SubagentManagerConfig
@@ -49,6 +50,14 @@ export function apply(ctx: Context, config: Config): void {
 
   // Register the model-facing subagent_template_* tools, owned by this fiber.
   ctx.effect(() => registerSubagentTemplateTools(ctx, manager))
+
+  // M4.3: systemPrompt roster injection — surface the enabled templates so the
+  // captain can build an agent-teams team from them by natural language.
+  ctx.systemPrompt.section({
+    name: 'subagent-manager:roster',
+    order: config.promptSectionOrder ?? 118,
+    text: () => buildRosterText(manager.listSync()),
+  })
 
   // Host route: settings page reads (GET) and writes (POST) through the same
   // DSH process. Conflicts are detected via the monotonic write revision.

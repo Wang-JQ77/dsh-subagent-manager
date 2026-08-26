@@ -85,6 +85,11 @@ export class SubagentManager extends Service {
     return this.registry.list()
   }
 
+  /** Sync in-memory snapshot for the systemPrompt roster text. */
+  listSync(): SubagentTemplate[] {
+    return this.registry.list()
+  }
+
   async get(id: string): Promise<SubagentTemplate | undefined> {
     return this.registry.get(id)
   }
