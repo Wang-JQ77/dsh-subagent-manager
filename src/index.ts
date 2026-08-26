@@ -41,7 +41,10 @@ const WEB_SERVER_KEYS = ['webServer', 'httpServer'] as const
 const STATE_ROUTE_PATH = '/plugins/dsh-subagent-manager/state'
 
 export const name = 'subagent-manager'
-export const inject = ['tools', 'systemPrompt']
+// settings is injected so the template store registers its namespace against a
+// bound dsh-settings service (otherwise apply() runs before it binds and the
+// store silently falls back to in-memory, losing templates on restart).
+export const inject = ['tools', 'systemPrompt', 'settings']
 
 /** Plugin configuration (delegates to the service config schema). */
 export type Config = SubagentManagerConfig
