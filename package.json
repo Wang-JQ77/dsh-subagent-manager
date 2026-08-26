@@ -59,7 +59,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit",
     "verify:build": "node scripts/verify.mjs",
     "verify": "node scripts/lifecycle-verify.mjs",
-    "prepublishOnly": "pnpm build && pnpm verify"
+    "test": "node --test test/registry.test.mjs",
+    "prepublishOnly": "pnpm build && pnpm test && pnpm verify"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1-rc.1",

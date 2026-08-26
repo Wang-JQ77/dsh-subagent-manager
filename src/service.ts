@@ -1,81 +1,34 @@
 /**
- * dsh-subagent-manager — host service definition.
+ * dsh-subagent-manager — host service (`ctx.subagentManager`).
  *
- * Provides `ctx.subagentManager`: the template registry service (M2). In M1
- * this is a compiling skeleton: the service registers itself on `ctx`, and the
- * template schema / storage / lifecycle rules land in M2.
+ * Registers a `subagentManager` service exposing the pure template registry
+ * (`TemplateRegistry`, storage-injected) plus the launch bridge to
+ * `ctx.subagents.startContinuable` and the running-instance registry. Runs on
+ * the `dsh-settings` namespace (feature-detected; in-memory fallback).
  *
- * @module dsh-subagent-manager/service
+ * Lifecycle contract (M2.4):
+ * - editing a template only affects instances launched afterwards; running
+ *   instances keep the snapshot they were launched from (snapshot at launch).
+ * - deleting a template archives (never physically removes).
+ * - disabling a template blocks new launches only; running instances are
+ *   unaffected.
+ * - fork members copy session state; blueprint templates default to spawn.
  */
-import { Service } from '@deepseek-ai/cordis'
-import type { Context } from '@deepseek-ai/cordis'
+import { Service, type Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-// Declaration merge only: expose ctx.llm / ctx.subagents for late resolution.
-import type {} from '@deepseek-ai/dsh-llm'
+import type {} from '@deepseek-ai/dsh-agent'
+import type { Agent } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-subagent'
-
-/** Roles that control how much a template's spawned sub-agent may do. */
-export type PermissionMode = 'readonly' | 'workspace' | 'full'
-
-/** Built-in agent composition presets a template may select. */
-export type AgentPreset = 'standard' | 'code' | 'minimal' | 'creator'
-
-/** Member-provider strategy used when launching a template. */
-export type MemberProvider = 'spawn' | 'fork'
-
-/**
- * A sub-agent template: the durable, cross-session recipe a member or an
- * independent continuable sub-agent is built from. `schemaVersion` guards
- * forward migration; `enabled` gates new launches only (running instances are
- * unaffected).
- */
-export interface SubagentTemplate {
-  /** Stable id (kebab-case), also the audit/instance namespace key. */
-  id: string
-  /** Human label shown in the roster / settings UI. */
-  label: string
-  /** One-line role the sub-agent plays (e.g. "code-reviewer"). */
-  role: string
-  /** Optional avatar url. */
-  avatar?: string
-  /** Model-facing persona text. Shadowing the deployment persona when set. */
-  persona?: string
-  /** `ctx.subagents` provider name ('spawn' | 'fork'). */
-  provider: string
-  /** Optional model override applied to the launched sub-agent. */
-  model?: string
-  /** Optional reasoning effort override. */
-  reasoningEffort?: string
-  /** Permission mode; the host enforces the dangerous-combo guard. */
-  permissionMode: PermissionMode
-  /** Optional built-in agent composition preset. */
-  agentPreset?: AgentPreset
-  /** Member-provider strategy used by agent-teams integration. */
-  memberProvider: MemberProvider
-  /** Delegation depth cap (0 forbids delegation). */
-  maxDepth?: number
-  /** Whether new launches are allowed. */
-  enabled: boolean
-  /** Free-form tags for natural-language roster matching. */
-  tags: string[]
-  /** Optional longer description. */
-  description?: string
-  /** Template schema version, for forward-compatible persistence. */
-  schemaVersion: number
-}
+import type { ContinuableStartSpec, SubagentStartRequest } from '@deepseek-ai/dsh-subagent'
+import { createTemplateStorage, type TemplateStorage } from './storage.ts'
+import { TemplateRegistry, type RunningInstance } from './registry.ts'
+import type { SubagentTemplate } from './schema.ts'
 
 /** Configuration for the subagent-manager plugin. */
 export interface SubagentManagerConfig {
-  /**
-   * Storage strategy. `auto` feature-detects `settingsScope`; falls back to a
-   * standalone profile-dir file when the scope is unavailable.
-   */
   storage?: 'auto' | 'settings' | 'file'
-  /** Default member-provider for new templates. */
   memberProvider?: string
-  /** Default delegation depth cap applied to a spawned template. */
   memberMaxDepth?: number
-  /** Prompt-section order for the template roster section. */
   promptSectionOrder?: number
 }
 
@@ -86,28 +39,120 @@ export const SubagentManagerConfig: z<SubagentManagerConfig> = z.object({
   promptSectionOrder: z.natural().default(118),
 })
 
+export type { RunningInstance }
+
+/** Launch inputs (caller supplies the delegation request). */
+export interface LaunchOptions {
+  prompt: SubagentStartRequest['prompt']
+  parent: SubagentStartRequest['parent']
+  label?: string
+  signal: AbortSignal
+}
+
+/** Result of a successful launch. */
+export interface LaunchResult {
+  childId: string
+  messageId: string
+  templateId: string
+}
+
 /**
- * Template registry service. Registered as `ctx.subagentManager`; the service
+ * Template registry service. Registers as `ctx.subagentManager`; the service
  * self-provides on construction and is removed with its owning fiber.
- *
- * M1 skeleton: M2 adds CRUD + enable + lifecycle rules + persistence.
  */
 export class SubagentManager extends Service {
   static Config = SubagentManagerConfig
 
-  constructor(ctx: Context, config: SubagentManagerConfig) {
-    super(ctx, 'subagentManager')
-    this.config = config
-  }
+  private registry: TemplateRegistry
+  private running = new Map<string, RunningInstance>()
 
-  private readonly config: SubagentManagerConfig
+  constructor(
+    ctx: Context,
+    private readonly config: SubagentManagerConfig,
+    storage?: TemplateStorage,
+  ) {
+    super(ctx, 'subagentManager')
+    this.registry = new TemplateRegistry(
+      storage ?? createTemplateStorage(ctx, { warn: (msg) => ctx.logger.warn?.(msg) }),
+    )
+  }
 
   async [Service.init](): Promise<void> {
-    // M2: load persisted templates, feature-detect settingsScope, set up state.
+    await this.registry.init()
   }
 
-  /** M2: list templates. */
   async list(): Promise<SubagentTemplate[]> {
-    return []
+    return this.registry.list()
+  }
+
+  async get(id: string): Promise<SubagentTemplate | undefined> {
+    return this.registry.get(id)
+  }
+
+  async create(input: SubagentTemplate): Promise<SubagentTemplate> {
+    return this.registry.create(input)
+  }
+
+  async update(id: string, patch: Partial<SubagentTemplate>): Promise<SubagentTemplate> {
+    return this.registry.update(id, patch)
+  }
+
+  async setEnabled(id: string, enabled: boolean): Promise<SubagentTemplate> {
+    return this.registry.setEnabled(id, enabled)
+  }
+
+  async archive(id: string): Promise<{ archived: true; running: RunningInstance[] }> {
+    const archived = await this.registry.archive(id)
+    return { ...archived, running: this.listRunningFor(id) }
+  }
+
+  async duplicate(id: string, newId?: string): Promise<SubagentTemplate> {
+    return this.registry.duplicate(id, newId)
+  }
+
+  /**
+   * Launch a template as a durable continuable child. Provider validation is
+   * deferred to `ctx.subagents.startContinuable` (first use). Snapshot the
+   * template at launch so later edits don't perturb this instance.
+   */
+  async launch(templateId: string, options: LaunchOptions): Promise<LaunchResult> {
+    const snapshot = this.registry.snapshotForLaunch(templateId)
+    const subagents = this.ctx.subagents
+    if (!subagents) throw new Error('ctx.subagents is not available; install dsh-subagent in this profile')
+
+    const spec: ContinuableStartSpec = {
+      provider: snapshot.provider,
+      label: options.label ?? snapshot.label,
+      request: {
+        prompt: options.prompt,
+        parent: options.parent,
+        persona: snapshot.persona || undefined,
+        maxDepth: snapshot.maxDepth,
+        agentOptions: snapshot.model ? { model: snapshot.model } : undefined,
+      },
+      signal: options.signal,
+    }
+    const started = await subagents.startContinuable(spec)
+    this.running.set(started.childId, {
+      childId: started.childId,
+      templateId: templateId,
+      templateLabel: snapshot.label,
+      provider: snapshot.provider,
+      status: 'running',
+      launchedAt: Date.now(),
+    })
+    return { childId: started.childId, messageId: started.messageId, templateId: templateId }
+  }
+
+  async listRunning(): Promise<RunningInstance[]> {
+    return [...this.running.values()]
+  }
+
+  private listRunningFor(templateId: string): RunningInstance[] {
+    return [...this.running.values()].filter((r) => r.templateId === templateId)
+  }
+
+  async stop(childId: string): Promise<void> {
+    this.running.delete(childId)
   }
 }

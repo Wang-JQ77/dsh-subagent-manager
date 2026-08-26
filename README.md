@@ -25,7 +25,7 @@ as members (**template = member**).
 |---|---|---|
 | M0 调研 | ✅ 完成 | 原生重叠定夺（独立方案）、slot 名核实、CLI/框架版本（均 `0.1.1-rc.2`）。结论见 `docs/M0-research.md`。 |
 | M1 骨架 | ✅ 完成 | `tsc -p tsconfig.json` 与 `tsc -p tsconfig.client.json` 均编译通过；`lib/` 产物生成。 |
-| M2 服务层 | ⏳ 待做 | 模板 schema / 持久化 / CRUD + enable / `subagent_template_*` 工具 / 生命周期 / 单测。 |
+| M2 服务层 | ✅ 完成 | 模板 schema + 安全策略、持久化（settings 命名空间 / 内存兑底）、CRUD + enable + 生命周期、`subagent_template_*` 工具、10 项单测全绿。 |
 | M3 设置页 | ⏳ 待做 | 模板列表 + 表单 + 导入导出 + i18n + host 状态路由轮询。 |
 | M4 agent-teams 打通 | ⏳ 待做 | 模板即成员 + 独立子 agent + systemPrompt 名册注入。 |
 | M5 实例视图 + 健壮性 | ⏳ 待做 | 运行实例视图 + 无障碍/竞态/清理 checklist。 |

@@ -17,6 +17,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { SubagentManager, type SubagentManagerConfig } from './service.ts'
 import { SubagentManagerConfig as ConfigSchema } from './service.ts'
+import { registerSubagentTemplateTools } from './tools.ts'
 
 /**
  * Structural slice of the web server service, compatible with both the
@@ -45,10 +46,12 @@ export const Config = ConfigSchema
 
 export function apply(ctx: Context, config: Config): void {
   // Provide the template registry service (self-registers on ctx).
-  new SubagentManager(ctx, config)
+  const manager = new SubagentManager(ctx, config)
 
-  // Host route: settings page polls for template/instance state (M3). Returns
-  // an empty snapshot until M2 fills the registry.
+  // Register the model-facing subagent_template_* tools, owned by this fiber.
+  ctx.effect(() => registerSubagentTemplateTools(ctx, manager))
+
+  // Host route: settings page polls for template/instance state (M3).
   const ws = detectWebServer(ctx)
   if (ws) {
     const handler = async (_req: IncomingMessage, res: ServerResponse): Promise<void> => {
@@ -56,7 +59,7 @@ export function apply(ctx: Context, config: Config): void {
       res.setHeader('Cache-Control', 'no-store')
       const body = JSON.stringify({
         templates: await ctx.subagentManager.list(),
-        running: [],
+        running: await ctx.subagentManager.listRunning(),
       })
       res.end(body)
     }
@@ -68,8 +71,6 @@ export function apply(ctx: Context, config: Config): void {
     )
   }
 
-  // M2.3: ctx.tools.register(defineTool(...)) for subagent_template_{create,update,enable,remove,list}.
-  // M2.2: persistence (settingsScope feature-detect or standalone file).
   // M4: systemPrompt roster section + agent-teams member join.
 }
 
