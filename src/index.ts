@@ -2,14 +2,14 @@
  * dsh-subagent-manager — host entry.
  *
  * A host-plane plugin that provides the `ctx.subagentManager` template registry
- * service (M2), the `subagent_template_*` management tools (M2.3), the system
- * prompt roster section (M4), and the `/plugins/subagent-manager/state` host
- * route the settings page polls (M3).
+ * service (M2), the `subagent_template_*` management tools (M2.3), and the
+ * `/plugins/subagent-manager/state` route the settings page reads (GET) and
+ * writes through (POST, M3). The client half registers the "Sub-agent Manager"
+ * settings section.
  *
  * Installation (bundle): `dsh plugin --profile <name> add dsh-subagent-manager`
  * (npm or a local path). The bundle patch mounts this plugin row into the host
- * composition; the client half registers the "Sub-agent Manager" settings
- * section.
+ * composition.
  *
  * @module dsh-subagent-manager
  */
@@ -18,13 +18,12 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { SubagentManager, type SubagentManagerConfig } from './service.ts'
 import { SubagentManagerConfig as ConfigSchema } from './service.ts'
 import { registerSubagentTemplateTools } from './tools.ts'
+import type { SubagentTemplate } from './schema.ts'
 
 /**
  * Structural slice of the web server service, compatible with both the
  * published `dsh-host-webserver@0.0.1-rc.1` (`ctx.httpServer`) and the renamed
- * `webServer` in later builds: the transition renames the service without
- * changing the route-registration shape. Missing keys are feature-detected and
- * reported rather than silently swallowed (compat-defense policy).
+ * `webServer` in later builds. Missing keys are feature-detected and reported.
  */
 interface WebRouteHost {
   register(route: {
@@ -51,27 +50,90 @@ export function apply(ctx: Context, config: Config): void {
   // Register the model-facing subagent_template_* tools, owned by this fiber.
   ctx.effect(() => registerSubagentTemplateTools(ctx, manager))
 
-  // Host route: settings page polls for template/instance state (M3).
+  // Host route: settings page reads (GET) and writes (POST) through the same
+  // DSH process. Conflicts are detected via the monotonic write revision.
   const ws = detectWebServer(ctx)
   if (ws) {
-    const handler = async (_req: IncomingMessage, res: ServerResponse): Promise<void> => {
-      res.setHeader('Content-Type', 'application/json')
-      res.setHeader('Cache-Control', 'no-store')
-      const body = JSON.stringify({
-        templates: await ctx.subagentManager.list(),
-        running: await ctx.subagentManager.listRunning(),
-      })
-      res.end(body)
+    const handler = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
+      const mgr = ctx.subagentManager
+      if (req.method === 'GET') {
+        return sendJson(res, 200, {
+          templates: await mgr.list(),
+          running: await mgr.listRunning(),
+          revision: mgr.getRevision(),
+        })
+      }
+      if (req.method === 'POST') {
+        const body = JSON.parse((await readBody(req)) || '{}') as {
+          action?: string
+          payload?: unknown
+          expectedRevision?: number
+        }
+        if (typeof body.expectedRevision === 'number' && body.expectedRevision !== mgr.getRevision()) {
+          return sendJson(res, 409, {
+            error: 'SETTINGS_CONFLICT',
+            message: 'Templates were changed by another session. Reload before writing.',
+          })
+        }
+        try {
+          const result = await dispatchAction(mgr, body.action, body.payload)
+          return sendJson(res, 200, { ok: true, result, revision: mgr.getRevision() })
+        } catch (error) {
+          return sendJson(res, 400, {
+            error: 'BAD_REQUEST',
+            message: error instanceof Error ? error.message : String(error),
+          })
+        }
+      }
+      return sendJson(res, 405, { error: 'METHOD_NOT_ALLOWED', message: 'Use GET to read or POST to write.' })
     }
     ctx.effect(() => ws.register({ kind: 'exact', path: '/plugins/subagent-manager/state', handler }))
   } else {
     // Feature-detect failure is an explicit report, never a silent hang.
     ctx.logger.warn?.(
-      '[subagent-manager] no web server service (webServer/httpServer) resolved; the settings page state route is disabled. Install dsh-host-webserver in this profile.',
+      '[subagent-manager] no web server service (webServer/httpServer) resolved; the settings page route is disabled. Install dsh-host-webserver in this profile.',
     )
   }
 
   // M4: systemPrompt roster section + agent-teams member join.
+}
+
+/** Dispatch a settings write action to the template registry service. */
+async function dispatchAction(mgr: SubagentManager, action: string | undefined, payload: unknown): Promise<unknown> {
+  const p = (payload ?? {}) as Record<string, unknown>
+  switch (action) {
+    case 'create':
+      return { template: await mgr.create(p as unknown as SubagentTemplate) }
+    case 'update': {
+      const id = String(p.id)
+      const patch = (p.patch ?? {}) as Partial<SubagentTemplate>
+      return { template: await mgr.update(id, patch) }
+    }
+    case 'set_enabled':
+      return { template: await mgr.setEnabled(String(p.id), Boolean(p.enabled)) }
+    case 'archive':
+      return { result: await mgr.archive(String(p.id)) }
+    case 'duplicate':
+      return { template: await mgr.duplicate(String(p.id), p.newId ? String(p.newId) : undefined) }
+    default:
+      throw new Error(`unknown action "${String(action)}"`)
+  }
+}
+
+function sendJson(res: ServerResponse, status: number, body: unknown): void {
+  res.statusCode = status
+  res.setHeader('Content-Type', 'application/json')
+  res.setHeader('Cache-Control', 'no-store')
+  res.end(JSON.stringify(body))
+}
+
+function readBody(req: IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let raw = ''
+    req.on('data', (chunk: Buffer) => { raw += chunk.toString('utf8') })
+    req.on('end', () => resolve(raw))
+    req.on('error', reject)
+  })
 }
 
 /** Resolve a web server service by key candidates, newest first. */

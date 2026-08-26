@@ -30,6 +30,7 @@ export interface RunningInstance {
 
 export class TemplateRegistry {
   private templates: SubagentTemplate[] = []
+  private revision = 0
 
   constructor(private readonly storage: TemplateRegistryStorage) {}
 
@@ -39,6 +40,12 @@ export class TemplateRegistry {
 
   private async persist(): Promise<void> {
     await this.storage.save({ schemaVersion: 1, templates: this.templates })
+    this.revision += 1
+  }
+
+  /** Monotonic write revision used for optimistic-concurrency conflict detection. */
+  getRevision(): number {
+    return this.revision
   }
 
   private require(id: string): SubagentTemplate {

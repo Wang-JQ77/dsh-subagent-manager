@@ -148,6 +148,11 @@ export class SubagentManager extends Service {
     return [...this.running.values()]
   }
 
+  /** Monotonic write revision for optimistic-concurrency conflict detection. */
+  getRevision(): number {
+    return this.registry.getRevision()
+  }
+
   private listRunningFor(templateId: string): RunningInstance[] {
     return [...this.running.values()].filter((r) => r.templateId === templateId)
   }
