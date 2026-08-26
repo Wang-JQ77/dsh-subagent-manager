@@ -47,9 +47,12 @@ export const inject = ['tools', 'systemPrompt']
 export type Config = SubagentManagerConfig
 export const Config = ConfigSchema
 
-export function apply(ctx: Context, config: Config): void {
+export async function apply(ctx: Context, config: Config): Promise<void> {
   // Provide the template registry service (self-registers on ctx).
   const manager = new SubagentManager(ctx, config)
+  // Function-plugin services don't get the Service.init lifecycle hook —
+  // initialize storage + registry (seed defaults) explicitly here.
+  await manager.ready()
 
   // Register the model-facing subagent_template_* tools, owned by this fiber.
   ctx.effect(() => registerSubagentTemplateTools(ctx, manager))

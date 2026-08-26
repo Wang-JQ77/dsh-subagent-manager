@@ -46,7 +46,7 @@ const cfg = { storage: 'auto', memberProvider: 'spawn', memberMaxDepth: 1, promp
 test('full flow: seed → CRUD → enable → launch → running → stop → archive → duplicate → roster', async () => {
   const ctx = mockCtx()
   const svc = new SubagentManager(ctx, cfg, memoryStorage())
-  await svc[Service.init]()
+  await svc.ready()
 
   // 1. Seed: 3 built-in templates, all disabled + readonly.
   const seeded = await svc.list()

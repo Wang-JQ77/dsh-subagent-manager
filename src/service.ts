@@ -78,10 +78,24 @@ export class SubagentManager extends Service {
   }
 
   async [Service.init](): Promise<void> {
-    // Register the settings namespace BEFORE seeding, otherwise save() throws
-    // "settings storage is not initialized" and the registry stays empty.
-    await this.storage.init()
-    await this.registry.init()
+    // NOTE: this lifecycle hook is only invoked for class-style plugins. This
+    // plugin is a function plugin that constructs the service in apply(), so
+    // apply() must call ready() explicitly.
+    await this.ready()
+  }
+
+  private readyPromise: Promise<void> | undefined
+
+  /**
+   * Idempotently initialize storage (register the settings namespace) then the
+   * registry (load + seed defaults). Called from apply() — see Service.init note.
+   */
+  ready(): Promise<void> {
+    this.readyPromise ??= (async () => {
+      await this.storage.init()
+      await this.registry.init()
+    })()
+    return this.readyPromise
   }
 
   async list(): Promise<SubagentTemplate[]> {
