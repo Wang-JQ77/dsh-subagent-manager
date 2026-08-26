@@ -19,6 +19,11 @@ function storage(initial = []) {
   }
 }
 
+/** Registry without automatic default seeding (pure-CRUD tests). */
+function makeReg(...args) {
+  return new TemplateRegistry(...args, { seedDefaults: false })
+}
+
 function template(overrides = {}) {
   return {
     id: 'code-reviewer',
@@ -38,7 +43,7 @@ function template(overrides = {}) {
 }
 
 test('create + list roundtrip', async () => {
-  const reg = new TemplateRegistry(storage())
+  const reg = makeReg(storage())
   await reg.init()
   await reg.create(template())
   assert.equal(reg.list().length, 1)
@@ -47,7 +52,7 @@ test('create + list roundtrip', async () => {
 })
 
 test('duplicate id is rejected', async () => {
-  const reg = new TemplateRegistry(storage())
+  const reg = makeReg(storage())
   await reg.init()
   await reg.create(template())
   await assert.rejects(() => reg.create(template()), /already taken/)
@@ -55,12 +60,11 @@ test('duplicate id is rejected', async () => {
 
 test('full-permission + enabled is rejected by policy', () => {
   assert.throws(() => assertSafeTemplate(template({ permissionMode: 'full', enabled: true })), /full.*enabled/)
-  // safe: full permission but disabled is allowed
   assert.doesNotThrow(() => assertSafeTemplate(template({ permissionMode: 'full', enabled: false })))
 })
 
 test('create rejects dangerous combo end-to-end', async () => {
-  const reg = new TemplateRegistry(storage())
+  const reg = makeReg(storage())
   await reg.init()
   await assert.rejects(
     () => reg.create(template({ permissionMode: 'full', enabled: true })),
@@ -79,7 +83,7 @@ test('invalid id rejected', () => {
 })
 
 test('disable blocks launch; running unaffected by edit', async () => {
-  const reg = new TemplateRegistry(storage())
+  const reg = makeReg(storage())
   await reg.init()
   await reg.create(template()) // disabled by default
   assert.throws(() => reg.snapshotForLaunch('code-reviewer'), /disabled/)
@@ -89,18 +93,17 @@ test('disable blocks launch; running unaffected by edit', async () => {
 })
 
 test('edit snapshot: update does not mutate the launch snapshot', async () => {
-  const reg = new TemplateRegistry(storage())
+  const reg = makeReg(storage())
   await reg.init()
   await reg.create(template({ enabled: true }))
   const before = reg.snapshotForLaunch('code-reviewer')
   await reg.update('code-reviewer', { label: 'Changed Label' })
-  // Running instance keeps its launch snapshot (the launch-time copy), not the edit.
   assert.equal(before.label, 'Code Reviewer')
   assert.equal(reg.get('code-reviewer').label, 'Changed Label')
 })
 
 test('archive disables and removes; duplicate creates disabled copy', async () => {
-  const reg = new TemplateRegistry(storage())
+  const reg = makeReg(storage())
   await reg.init()
   await reg.create(template())
   await reg.setEnabled('code-reviewer', true)
@@ -109,12 +112,12 @@ test('archive disables and removes; duplicate creates disabled copy', async () =
   await reg.create(template())
   const copy = await reg.duplicate('code-reviewer', 'code-reviewer-2')
   assert.equal(copy.id, 'code-reviewer-2')
-  assert.equal(copy.enabled, false) // duplicate is always disabled
+  assert.equal(copy.enabled, false)
 })
 
 test('persistence writes through the storage adapter', async () => {
   const store = storage()
-  const reg = new TemplateRegistry(store)
+  const reg = makeReg(store)
   await reg.init()
   await reg.create(template())
   assert.equal(store.dump().templates.length, 1)

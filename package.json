@@ -56,7 +56,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit",
     "verify:build": "node scripts/verify.mjs",
     "verify": "node scripts/lifecycle-verify.mjs",
-    "test": "node --test test/registry.test.mjs",
+    "test": "node --test test/registry.test.mjs test/fullflow.test.mjs",
     "prepublishOnly": "pnpm build && pnpm test && pnpm verify"
   },
   "peerDependencies": {

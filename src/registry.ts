@@ -11,6 +11,7 @@ import {
   type SubagentTemplate,
   type StoredTemplates,
 } from './schema.ts'
+import { defaultTemplates } from './default-templates.ts'
 
 /** Persistence seam (structural slice of the storage adapter). */
 export interface TemplateRegistryStorage {
@@ -31,11 +32,26 @@ export interface RunningInstance {
 export class TemplateRegistry {
   private templates: SubagentTemplate[] = []
   private revision = 0
+  private readonly seedDefaults: boolean
 
-  constructor(private readonly storage: TemplateRegistryStorage) {}
+  constructor(
+    private readonly storage: TemplateRegistryStorage,
+    options?: { seedDefaults?: boolean },
+  ) {
+    this.seedDefaults = options?.seedDefaults ?? true
+  }
 
   async init(): Promise<void> {
-    this.templates = (await this.storage.load()).templates
+    const stored = await this.storage.load()
+    // Seed a safe starter set on first run (empty store), like the native
+    // presets ship standard/code/minimal. All defaults are disabled + readonly.
+    if (this.seedDefaults && stored.templates.length === 0) {
+      this.templates = defaultTemplates()
+      await this.storage.save({ schemaVersion: 1, templates: this.templates })
+      this.revision += 1
+    } else {
+      this.templates = stored.templates
+    }
   }
 
   private async persist(): Promise<void> {
