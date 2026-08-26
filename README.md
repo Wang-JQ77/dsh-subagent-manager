@@ -29,7 +29,7 @@ as members (**template = member**).
 | M3 设置页 | ✅ 编译通过 | host GET/POST `/plugins/subagent-manager/state` 路由 + 冲突版本；client `settings.section` 设置页（列表/表单/启停/归档/导入导出）+ 轮询/焦点刷新 + i18n。GUI 渲染待 M6。 |
 | M4 agent-teams 打通 | 🔶 部分 | **systemPrompt 名册注入已实现**（`subagent-manager:roster` section，纯外挂式，单测+编译通过）。「模板即成员一键加团队」与 agent-teams 运行时联动待做（需 live agent-teams + 会话验证）。 |
 | M5 实例视图 + 健壮性 | ✅ 完成 | 运行实例视图 + stop 按钮 + 轮询/焦点刷新/防重叠 + 版本冲突 409 + 归档确认 + 无障碍说明。 |
-| M6 验证 + 发布 | 🔶 部分 | typecheck（双 program）+ build（client bundle 10.6kB→verify OK）+ 单测全绿 + **scratch profile 真实 `--dump-config` 组合树已含 `subagent-manager` 插件行（安装链路 dogfood 关键步通过）**。剩余：headless 任务 + npm 发布后真实包名干净 profile 完整安装（硬关卡）。 |
+| M6 验证 + 发布 | 🔶 已完成可离线部分 | typecheck（双 program）+ build（host+client bundle）+ 单测全绿 + **干净 profile 完整安装 dogfood 通过**（`npm pack` 产物 → 新建 `dsh-sam-dogfood` profile → `dsh plugin add <tarball>` → bundle 对账 → `--dump-config` 组合树含插件行 → 安装包 exports(main/client/patch) 全部解析）。**剩余：npm 发布（需授权）+ headless 真实任务验证（需 LLM 额度）**。 |
 
 ---
 
