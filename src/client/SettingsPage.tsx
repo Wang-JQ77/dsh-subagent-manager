@@ -5,13 +5,17 @@
  * POST writes) so all mutations ride the DSH process. Polls every ~3s with an
  * in-flight guard, and refreshes on window focus.
  */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import { SUBAGENT_MANAGER_LOCALE_NAMESPACE } from './locales.ts'
 import styles from './SettingsPage.module.css'
 
 export interface SettingsPageProps {
   close?: () => void
+  /** Current session cwd (project path); provided by the client entry. */
+  getCurrentCwd?: () => string | undefined
+  /** Session-list change subscription; provided by the client entry. */
+  subscribeSessions?: (fn: () => void) => () => void
 }
 
 /** Client mirror of the host template + running instance surfaces. */
@@ -78,13 +82,24 @@ function blank(): Tmpl {
 
 export function SettingsPage({
   close: _close,
+  getCurrentCwd,
+  subscribeSessions,
   t,
 }: SettingsPageProps & PropsLocale<typeof SUBAGENT_MANAGER_LOCALE_NAMESPACE>) {
   const [state, setState] = useState<State>(EMPTY_STATE)
   const [editing, setEditing] = useState<Tmpl | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [onlyCurrentProject, setOnlyCurrentProject] = useState(true)
   const inFlight = useRef(false)
+
+  // Current project (cwd path segments) for the scope filter.
+  const cwd = useSyncExternalStore(
+    subscribeSessions ?? (() => () => {}),
+    getCurrentCwd ?? (() => undefined),
+    getCurrentCwd ?? (() => undefined),
+  )
+  const currentSegments = useMemo(() => (cwd ?? '').split(/[\\/]+/).filter(Boolean), [cwd])
 
   const refresh = async (): Promise<void> => {
     if (inFlight.current) return
@@ -182,6 +197,10 @@ export function SettingsPage({
   }
 
   const { templates, running } = state
+  const visibleTemplates = onlyCurrentProject
+    ? templates.filter((t) => !t.scope?.startsWith('project:') || (t.scope !== undefined && currentSegments.includes(t.scope.replace(/^project:/, ''))))
+    : templates
+  const hiddenCount = templates.length - visibleTemplates.length
 
   return (
     <section className={styles.page}>
@@ -204,28 +223,39 @@ export function SettingsPage({
       {templates.length === 0 ? (
         <p className={styles.empty}>{t('template.empty')}</p>
       ) : (
-        <ul className={styles.list}>
-          {templates.map((tmpl) => (
-            <li key={tmpl.id} className={styles.card}>
-              <div className={styles.cardMain}>
-                <strong>{tmpl.name}</strong> <code>{tmpl.id}</code>
-                <span className={styles.meta}> · {tmpl.role} · {tmpl.permissionMode} · {tmpl.model || tmpl.provider}</span>
-                {tmpl.scope && tmpl.scope !== 'global' && <span className={styles.scope}>{tmpl.scope.replace(/^project:/, '')}</span>}
-              </div>
-              <div className={styles.cardActions}>
-                <label className={styles.enable}>
-                  <input type="checkbox" checked={tmpl.enabled} onChange={(e) => void setEnabled(tmpl.id, e.target.checked)} />
-                  {' '}{t('template.enabled')}
-                </label>
-                <button onClick={() => setEditing(tmpl)}>{t('template.edit')}</button>
-                <button onClick={() => void duplicate(tmpl.id)}>{t('template.duplicate')}</button>
-                <button onClick={() => void joinTeam(tmpl.id)}>{t('template.joinTeam')}</button>
-                <button onClick={() => void remove(tmpl.id)}>{t('template.delete')}</button>
-                {running.some((r) => r.templateId === tmpl.id) && <span className={styles.running} title="running">●</span>}
-              </div>
-            </li>
-          ))}
-        </ul>
+        <>
+          <label className={styles.enable}>
+            <input type="checkbox" checked={onlyCurrentProject} onChange={(e) => setOnlyCurrentProject(e.target.checked)} />
+            {' '}{t('template.onlyCurrentProject')}
+          </label>
+          {hiddenCount > 0 && <p className={styles.meta}>{t('template.hiddenCount').replace('{n}', String(hiddenCount))}</p>}
+          {visibleTemplates.length === 0 ? (
+            <p className={styles.empty}>{t('template.empty')}</p>
+          ) : (
+            <ul className={styles.list}>
+              {visibleTemplates.map((tmpl) => (
+                <li key={tmpl.id} className={styles.card}>
+                  <div className={styles.cardMain}>
+                    <strong>{tmpl.name}</strong> <code>{tmpl.id}</code>
+                    <span className={styles.meta}> · {tmpl.role} · {tmpl.permissionMode} · {tmpl.model || tmpl.provider}</span>
+                    {tmpl.scope && tmpl.scope !== 'global' && <span className={styles.scope}>{tmpl.scope.replace(/^project:/, '')}</span>}
+                  </div>
+                  <div className={styles.cardActions}>
+                    <label className={styles.enable}>
+                      <input type="checkbox" checked={tmpl.enabled} onChange={(e) => void setEnabled(tmpl.id, e.target.checked)} />
+                      {' '}{t('template.enabled')}
+                    </label>
+                    <button onClick={() => setEditing(tmpl)}>{t('template.edit')}</button>
+                    <button onClick={() => void duplicate(tmpl.id)}>{t('template.duplicate')}</button>
+                    <button onClick={() => void joinTeam(tmpl.id)}>{t('template.joinTeam')}</button>
+                    <button onClick={() => void remove(tmpl.id)}>{t('template.delete')}</button>
+                    {running.some((r) => r.templateId === tmpl.id) && <span className={styles.running} title="running">●</span>}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
       )}
 
       {editing && (

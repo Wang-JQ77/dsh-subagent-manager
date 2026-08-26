@@ -26,8 +26,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   }
 }
 
-/** Required services: slot registry and locale. */
-export const inject = ['slots', 'locale']
+/** Required services: slot registry, locale, and sessions (for the current project filter). */
+export const inject = ['slots', 'locale', 'sessions']
 
 export function apply(ctx: ClientContext): void {
   ctx.effect(
@@ -41,7 +41,21 @@ export function apply(ctx: ClientContext): void {
     order: 90,
     label: 'Sub-agent Manager',
     locale: SUBAGENT_MANAGER_LOCALE_NAMESPACE,
-  }, (props: SettingsPageProps & PropsLocale<'subagentManager'>) => (
-    <SettingsPage {...props} />
-  )))
+  }, (props: SettingsPageProps & PropsLocale<'subagentManager'>) => {
+    // Current project (cwd) + change subscription, so the page can hide
+    // templates scoped to other projects.
+    const sessionsList = ctx.sessions.list
+    const getCurrentCwd = (): string | undefined => {
+      const snap = sessionsList.getSnapshot()
+      const current = snap.current
+      return current === undefined ? undefined : snap.byId[current]?.cwd
+    }
+    return (
+      <SettingsPage
+        {...props}
+        getCurrentCwd={getCurrentCwd}
+        subscribeSessions={sessionsList.subscribe.bind(sessionsList)}
+      />
+    )
+  }))
 }
