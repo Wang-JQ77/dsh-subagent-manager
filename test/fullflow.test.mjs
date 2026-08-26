@@ -17,6 +17,7 @@ import { buildRosterText } from '../lib/roster.js'
 function memoryStorage() {
   let value = { schemaVersion: 1, templates: [] }
   return {
+    async init() {},
     async load() { return structuredClone(value) },
     async save(next) { value = structuredClone(next) },
     dump: () => structuredClone(value),

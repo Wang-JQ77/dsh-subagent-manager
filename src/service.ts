@@ -63,6 +63,7 @@ export interface LaunchResult {
 export class SubagentManager extends Service {
   static Config = SubagentManagerConfig
 
+  private readonly storage: TemplateStorage
   private registry: TemplateRegistry
   private running = new Map<string, RunningInstance>()
 
@@ -72,12 +73,14 @@ export class SubagentManager extends Service {
     storage?: TemplateStorage,
   ) {
     super(ctx, 'subagentManager')
-    this.registry = new TemplateRegistry(
-      storage ?? createTemplateStorage(ctx, { warn: (msg) => ctx.logger.warn?.(msg) }),
-    )
+    this.storage = storage ?? createTemplateStorage(ctx, { warn: (msg) => ctx.logger.warn?.(msg) })
+    this.registry = new TemplateRegistry(this.storage)
   }
 
   async [Service.init](): Promise<void> {
+    // Register the settings namespace BEFORE seeding, otherwise save() throws
+    // "settings storage is not initialized" and the registry stays empty.
+    await this.storage.init()
     await this.registry.init()
   }
 
