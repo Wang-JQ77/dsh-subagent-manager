@@ -145,7 +145,7 @@ export class SubagentManager extends Service {
 
     const spec: ContinuableStartSpec = {
       provider: snapshot.provider,
-      label: options.label ?? snapshot.label,
+      label: options.label ?? snapshot.name,
       request: {
         prompt: options.prompt,
         parent: options.parent,
@@ -159,7 +159,7 @@ export class SubagentManager extends Service {
     this.running.set(started.childId, {
       childId: started.childId,
       templateId: templateId,
-      templateLabel: snapshot.label,
+      templateLabel: snapshot.name,
       provider: snapshot.provider,
       status: 'running',
       launchedAt: Date.now(),

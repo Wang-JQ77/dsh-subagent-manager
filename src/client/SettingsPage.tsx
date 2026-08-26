@@ -18,13 +18,13 @@ export interface SettingsPageProps {
 export interface Tmpl {
   id: string
   name: string
-  label: string
   role: string
   persona?: string
   provider: string
   model?: string
   reasoningEffort?: string
   permissionMode: 'readonly' | 'workspace' | 'full'
+  agentPreset?: 'standard' | 'code' | 'minimal' | 'creator'
   memberProvider: 'spawn' | 'fork'
   maxDepth?: number
   enabled: boolean
@@ -70,8 +70,8 @@ async function write(action: string, payload: unknown, expectedRevision: number)
 
 function blank(): Tmpl {
   return {
-    id: '', name: '', label: '', role: '', persona: '', provider: 'spawn', model: '',
-    reasoningEffort: '', permissionMode: 'readonly', memberProvider: 'spawn', maxDepth: 1,
+    id: '', name: '', role: '', persona: '', provider: 'spawn', model: '',
+    reasoningEffort: '', permissionMode: 'readonly', agentPreset: 'standard', memberProvider: 'spawn', maxDepth: 1,
     enabled: false, tags: [], description: '', schemaVersion: 1,
   }
 }
@@ -208,7 +208,7 @@ export function SettingsPage({
           {templates.map((tmpl) => (
             <li key={tmpl.id} className={styles.card}>
               <div className={styles.cardMain}>
-                <strong>{tmpl.label}</strong> <code>{tmpl.id}</code>
+                <strong>{tmpl.name}</strong> <code>{tmpl.id}</code>
                 <span className={styles.meta}> · {tmpl.role} · {tmpl.permissionMode} · {tmpl.model || tmpl.provider}</span>
               </div>
               <div className={styles.cardActions}>
@@ -268,20 +268,20 @@ function TemplateForm({ initial, isNew, onSave, onCancel, t }: {
   const [draft, setDraft] = useState<Tmpl>(initial)
   const set = (patch: Partial<Tmpl>): void => setDraft((d) => ({ ...d, ...patch }))
   const submit = (e: React.FormEvent): void => { e.preventDefault(); void onSave(draft) }
+  // name defaults to the id for new templates (user can still change it later).
+  const setId = (id: string): void => {
+    setDraft((d) => ({ ...d, id, ...(isNew && (d.name === '' || d.name === d.id) ? { name: id } : {}) }))
+  }
   return (
     <form className={styles.form} onSubmit={submit}>
       <div className={styles.formGrid}>
         <label className={styles.field}>
           <span className={styles.label}>{t('template.id')}</span>
-          <input value={draft.id} disabled={!isNew} onChange={(e) => set({ id: e.target.value })} />
+          <input value={draft.id} disabled={!isNew} onChange={(e) => setId(e.target.value)} />
         </label>
         <label className={styles.field}>
           <span className={styles.label}>{t('template.name')}</span>
           <input value={draft.name} onChange={(e) => set({ name: e.target.value })} />
-        </label>
-        <label className={styles.field}>
-          <span className={styles.label}>{t('template.label')}</span>
-          <input value={draft.label} onChange={(e) => set({ label: e.target.value })} />
         </label>
         <label className={styles.field}>
           <span className={styles.label}>{t('template.role')}</span>
@@ -296,18 +296,44 @@ function TemplateForm({ initial, isNew, onSave, onCancel, t }: {
           <input value={draft.model ?? ''} onChange={(e) => set({ model: e.target.value })} />
         </label>
         <label className={styles.field}>
+          <span className={styles.label}>{t('template.reasoningEffort')}</span>
+          <select value={draft.reasoningEffort ?? ''} onChange={(e) => set({ reasoningEffort: e.target.value })}>
+            <option value="">default</option><option value="low">low</option><option value="medium">medium</option><option value="high">high</option>
+          </select>
+        </label>
+        <label className={styles.field}>
           <span className={styles.label}>{t('template.permissionMode')}</span>
           <select value={draft.permissionMode} onChange={(e) => set({ permissionMode: e.target.value as Tmpl['permissionMode'] })}>
             <option value="readonly">readonly</option><option value="workspace">workspace</option><option value="full">full</option>
           </select>
         </label>
         <label className={styles.field}>
+          <span className={styles.label}>{t('template.memberProvider')}</span>
+          <select value={draft.memberProvider} onChange={(e) => set({ memberProvider: e.target.value as Tmpl['memberProvider'] })}>
+            <option value="spawn">spawn</option><option value="fork">fork</option>
+          </select>
+        </label>
+        <label className={styles.field}>
+          <span className={styles.label}>{t('template.agentPreset')}</span>
+          <select value={draft.agentPreset ?? 'standard'} onChange={(e) => set({ agentPreset: e.target.value as Tmpl['agentPreset'] })}>
+            <option value="standard">standard</option><option value="code">code</option><option value="minimal">minimal</option><option value="creator">creator</option>
+          </select>
+        </label>
+        <label className={styles.field}>
           <span className={styles.label}>{t('template.maxDepth')}</span>
           <input type="number" min={0} value={draft.maxDepth ?? 1} onChange={(e) => set({ maxDepth: Number(e.target.value) })} />
+        </label>
+        <label className={styles.field}>
+          <span className={styles.label}>{t('template.tags')}</span>
+          <input value={draft.tags.join(', ')} onChange={(e) => set({ tags: e.target.value.split(',').map((s) => s.trim()).filter(Boolean) })} />
         </label>
         <label className={styles.fieldFull}>
           <span className={styles.label}>{t('template.persona')}</span>
           <textarea rows={3} value={draft.persona ?? ''} onChange={(e) => set({ persona: e.target.value })} />
+        </label>
+        <label className={styles.fieldFull}>
+          <span className={styles.label}>{t('template.description')}</span>
+          <textarea rows={2} value={draft.description ?? ''} onChange={(e) => set({ description: e.target.value })} />
         </label>
       </div>
 

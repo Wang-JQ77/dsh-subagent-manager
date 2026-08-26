@@ -14,11 +14,11 @@ import type { SubagentManager } from './service.ts'
 import type { PermissionMode } from './schema.ts'
 
 export interface ListOutput {
-  templates: { id: string; label: string; role: string; provider: string; model: string; permission_mode: string; enabled: boolean }[]
+  templates: { id: string; name: string; role: string; provider: string; model: string; permission_mode: string; enabled: boolean }[]
 }
 export interface CreateOutput {
   id: string
-  label: string
+  name: string
   role: string
   permission_mode: string
   enabled: boolean
@@ -51,30 +51,29 @@ export function registerSubagentTemplateTools(ctx: Context, manager: SubagentMan
 
   const listTool = defineTool({
     name: 'subagent_template_list',
-    description: 'List sub-agent templates. Returns id, label, role, provider, model, permission mode and enabled state for every template. Use before creating or launching.',
+    description: 'List sub-agent templates. Returns id, name, role, provider, model, permission mode and enabled state for every template. Use before creating or launching.',
     parameters: { id: { type: 'string', description: 'Optional template id filter; omit to list all.' } },
     output: {
       schema: { type: 'object', additionalProperties: false, properties: {
         templates: { type: 'array', required: true, items: { type: 'object', additionalProperties: false, properties: {
-          id: { type: 'string', required: true }, label: { type: 'string', required: true }, role: { type: 'string', required: true }, provider: { type: 'string', required: true }, model: { type: 'string', required: true }, permission_mode: { type: 'string', required: true }, enabled: { type: 'boolean', required: true } } } },
+          id: { type: 'string', required: true }, name: { type: 'string', required: true }, role: { type: 'string', required: true }, provider: { type: 'string', required: true }, model: { type: 'string', required: true }, permission_mode: { type: 'string', required: true }, enabled: { type: 'boolean', required: true } } } },
       } },
       render: (_args: unknown, value: ListOutput) => text(`Sub-agent templates: ${value.templates.length ? value.templates.map((t) => t.id).join(', ') : 'none'}`),
     },
     execute: async (args) => {
       const templates = await manager.list()
       const filtered = args.id ? templates.filter((t) => t.id === args.id) : templates
-      return { templates: filtered.map((t) => ({ id: t.id, label: t.label, role: t.role, provider: t.provider, model: t.model ?? '', permission_mode: t.permissionMode, enabled: t.enabled })) }
+      return { templates: filtered.map((t) => ({ id: t.id, name: t.name, role: t.role, provider: t.provider, model: t.model ?? '', permission_mode: t.permissionMode, enabled: t.enabled })) }
     },
   })
   dispose.push(ctx.tools.register(listTool))
 
   const createTool = defineTool({
     name: 'subagent_template_create',
-    description: 'Create a sub-agent template from a named recipe. Provide a kebab-case id, a short name, a display label, a role, and optionally a persona, model, provider, permission mode (readonly|workspace|full: defaults readonly), max depth, and tags. Permission "full" may only be created with enabled=false.',
+    description: 'Create a sub-agent template from a named recipe. Provide a kebab-case id, a role, and optionally a name (defaults to the id), persona, model, provider, permission mode (readonly|workspace|full: defaults readonly), max depth, and tags. Permission "full" may only be created with enabled=false.',
     parameters: {
       id: { type: 'string', required: true, description: 'Kebab-case stable template id.' },
-      name: { type: 'string', required: true, description: 'Short member name used by agent-teams.' },
-      label: { type: 'string', required: true, description: 'Display / natural-language roster label.' },
+      name: { type: 'string', description: 'Member name; defaults to the template id.' },
       role: { type: 'string', required: true, description: 'One-line role this sub-agent plays.' },
       persona: { type: 'string', description: 'Model-facing persona text.' },
       provider: { type: 'string', description: "Subagent provider ('spawn' | 'fork'); defaults to spawn." },
@@ -86,15 +85,14 @@ export function registerSubagentTemplateTools(ctx: Context, manager: SubagentMan
     },
     output: {
       schema: { type: 'object', additionalProperties: false, properties: {
-        id: { type: 'string', required: true }, label: { type: 'string', required: true }, role: { type: 'string', required: true }, permission_mode: { type: 'string', required: true }, enabled: { type: 'boolean', required: true },
+        id: { type: 'string', required: true }, name: { type: 'string', required: true }, role: { type: 'string', required: true }, permission_mode: { type: 'string', required: true }, enabled: { type: 'boolean', required: true },
       } },
-      render: (_args: unknown, value: CreateOutput) => text(`Template "${value.id}" created (${value.label}, ${value.permission_mode}, enabled=${value.enabled}).`),
+      render: (_args: unknown, value: CreateOutput) => text(`Template "${value.id}" created (${value.name}, ${value.permission_mode}, enabled=${value.enabled}).`),
     },
     execute: async (args) => {
       const created = await manager.create({
         id: args.id.trim(),
-        name: args.name.trim(),
-        label: args.label.trim(),
+        name: (args.name ?? args.id).trim(),
         role: args.role.trim(),
         persona: args.persona,
         provider: args.provider ?? 'spawn',
@@ -106,7 +104,7 @@ export function registerSubagentTemplateTools(ctx: Context, manager: SubagentMan
         tags: args.tags ?? [],
         schemaVersion: 1,
       })
-      return { id: created.id, label: created.label, role: created.role, permission_mode: created.permissionMode, enabled: created.enabled }
+      return { id: created.id, name: created.name, role: created.role, permission_mode: created.permissionMode, enabled: created.enabled }
     },
   })
   dispose.push(ctx.tools.register(createTool))

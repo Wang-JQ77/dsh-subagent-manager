@@ -17,7 +17,7 @@ export type SubAgentTemplateAuditAction =
 /** Audit payload appended to the session event log on each template lifecycle action. */
 export interface SubAgentTemplateAuditEvent {
   templateId: string
-  label: string
+  name: string
   action: SubAgentTemplateAuditAction
   at: string
 }
