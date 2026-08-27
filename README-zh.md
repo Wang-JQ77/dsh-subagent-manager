@@ -47,7 +47,7 @@ dsh plugin --profile web add -w github:Wang-JQ77/dsh-subagent-manager
 要可复现安装，请钉住 tag 或完整 commit，而不是分支头：
 
 ```sh
-dsh plugin --profile web add -w github:Wang-JQ77/dsh-subagent-manager#v0.1.0-rc.2
+dsh plugin --profile web add -w github:Wang-JQ77/dsh-subagent-manager#v0.1.0
 ```
 
 ### 方式二 —— 从 Release 的 tarball 安装
@@ -55,7 +55,7 @@ dsh plugin --profile web add -w github:Wang-JQ77/dsh-subagent-manager#v0.1.0-rc.
 从 [GitHub Releases](https://github.com/Wang-JQ77/dsh-subagent-manager/releases) 下载最新的 `.tgz`，然后：
 
 ```sh
-dsh plugin --profile web add -w ./dsh-subagent-manager-0.1.0-rc.2.tgz
+dsh plugin --profile web add -w ./dsh-subagent-manager-0.1.0.tgz
 ```
 
 tarball 方式完全不依赖 git，也不需要 pnpm 的构建授权。

@@ -49,7 +49,7 @@ dsh plugin --profile web add -w github:Wang-JQ77/dsh-subagent-manager
 For reproducibility, pin a tag or full commit instead of the branch tip:
 
 ```sh
-dsh plugin --profile web add -w github:Wang-JQ77/dsh-subagent-manager#v0.1.0-rc.2
+dsh plugin --profile web add -w github:Wang-JQ77/dsh-subagent-manager#v0.1.0
 ```
 
 ### Option 2 — install from a release tarball
@@ -58,7 +58,7 @@ Download the latest `.tgz` from [GitHub Releases](https://github.com/Wang-JQ77/d
 then:
 
 ```sh
-dsh plugin --profile web add -w ./dsh-subagent-manager-0.1.0-rc.2.tgz
+dsh plugin --profile web add -w ./dsh-subagent-manager-0.1.0.tgz
 ```
 
 A tarball avoids git entirely — no git binary and no pnpm build approval needed.
