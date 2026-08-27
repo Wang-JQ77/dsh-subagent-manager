@@ -1,96 +1,241 @@
 # dsh-subagent-manager
 
-![Node.js](https://img.shields.io/badge/node-%3E%3D22-blue) ![License: MIT](https://img.shields.io/badge/license-MIT-green) ![status](https://img.shields.io/badge/status-M0%E2%80%93M6%20(offline%20parts)-informational)
+[English](README.md) | [简体中文](README-zh.md)
 
-Sub-agent template manager for DeepSeek Harness (DSH): create / edit / enable
-sub-agent templates, launch them as durable continuable children, and join
-templates into [dsh-agent-teams](https://github.com/NanmiCoder/dsh-agent-teams)
-as members (**template = member**).
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+![Node.js](https://img.shields.io/badge/node-%3E%3D22.19%20%7C%7C%3E%3D24-blue)
+![DeepSeek Harness](https://img.shields.io/badge/DSH-0.1.1%E2%80%91rc.2-informational)
+![Platform](https://img.shields.io/badge/profile-web-important)
 
-> 项目代号：`dsh-subagent-manager` · 状态：**M0–M6 可离线部分完成**（构建、单测、干净 profile 安装 dogfood、headless 启动 `apply()` 验证与修复均通过；仅剩 npm 发布）。
-> 来源计划：《dsh-agent-manager-合并计划》（2026-08-26）
+**Reusable sub-agent templates for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness).**
+Define each specialist once — display name, persona, model route, permission mode, depth cap —
+then launch it as a durable, continuable sub-agent from any conversation, pin it to a single
+project, or hand it to an Agent-Teams squad as a member.
 
----
+## Why this plugin
 
-## 与原生 `dsh-agent-presets` 的边界
+A sub-agent is worth defining once, as a product object, instead of re-describing it in every
+prompt.
 
-- **`@deepseek-ai/dsh-agent-presets` + `dsh-client-ui-agent-preset`**：负责「某会话按哪套 preset `agent.cordis.yml` 组装」（per-session composition，会话创建时即固定）。
-- **本插件 `dsh-subagent-manager`**：负责「按模板拉起 / 复用子 agent，并让模板以成员身份进入 agent-teams」。管理的是子 Agent **成员模板**字段（provider / model / reasoningEffort / persona / permissionMode / memberProvider(spawn|fork) / maxDepth / enabled / tags），与原生 preset 正交。
-- **复用策略**：站在原生 `ctx.subagents` / `ctx.systemPrompt` / `ctx.webServer` 之上；不复用原生 preset 组合机制，但沿用其 service-key feature detection 模式。
-- 详细证据见 [`docs/M0-research.md`](docs/M0-research.md)。
+| Capability | User outcome |
+| --- | --- |
+| Reusable templates | Define a reviewer, auditor, writer, or domain expert once; reuse across conversations and projects |
+| Durable continuable children | Launched agents keep their own resumable session instead of being fire-and-forget |
+| Safety policy by construction | Read-only permission by default; a full-permission template can never be enabled |
+| Project scoping | `global` or `project:<id>`, re-checked at launch; the settings page hides foreign projects |
+| Roster injection | The lead model always sees enabled specialists together with their routes and personas |
+| Managed lifecycle | Editing never disturbs running instances; disabling only blocks new launches |
+| Optimistic concurrency | Multi-session writes conflict loudly with HTTP 409 instead of silently racing |
+| Instance view + JSON port | See and stop live children; export/import the whole roster |
 
----
+## Requirements
 
-## 里程碑状态
+- DeepSeek Harness `0.1.1` channel (developed and verified against `0.1.1-rc.2`)
+- The **Web** profile
+- Node.js `>=22.19.0 <23` or `>=24`
+- TypeScript + tsdown available locally when building from source (`npm i -g typescript@5.9.3 tsdown@0.22.2 lightningcss@1.33.0` or install them locally)
 
-| 里程碑 | 状态 | 说明 |
-|---|---|---|
-| M0 调研 | ✅ 完成 | 原生重叠定夺（独立方案）、slot 名核实、CLI/框架版本（均 `0.1.1-rc.2`）。结论见 `docs/M0-research.md`。 |
-| M1 骨架 | ✅ 完成 | `tsc -p tsconfig.json` 与 `tsc -p tsconfig.client.json` 均编译通过；`lib/` 产物生成。 |
-| M2 服务层 | ✅ 完成 | 模板 schema + 安全策略、持久化（settings 命名空间 / 内存兑底）、CRUD + enable + 生命周期、`subagent_template_*` 工具、10 项单测全绿。 |
-| M3 设置页 | ✅ 编译通过 | host GET/POST `/plugins/subagent-manager/state` 路由 + 冲突版本；client `settings.section` 设置页（列表/表单/启停/归档/导入导出）+ 轮询/焦点刷新 + i18n。GUI 渲染待 M6。 |
-| M4 agent-teams 打通 | 🔶 部分 | **systemPrompt 名册注入已实现**（`subagent-manager:roster` section，纯外挂式，单测+编译通过）。「模板即成员一键加团队」与 agent-teams 运行时联动待做（需 live agent-teams + 会话验证）。 |
-| M5 实例视图 + 健壮性 | ✅ 完成 | 运行实例视图 + stop 按钮 + 轮询/焦点刷新/防重叠 + 版本冲突 409 + 归档确认 + 无障碍说明。 |
-| M6 验证 + 发布 | 🔶 已完成可离线部分 | typecheck（双 program）+ build（host+client bundle）+ 单测全绿 + **干净 profile 完整安装 dogfood 通过**（`npm pack` → 新建 `dsh-sam-dogfood` profile → `dsh plugin add <tarball>` → `--dump-config` 组合树含插件行 → exports(main/client/patch) 全部解析）+ **headless 启动验证了插件 `apply()` 真实执行**（暴露并修复了「可选服务直取 `ctx.settings` → without inject 崩溃」，改用 `ctx.get()`）。剩余：npm 发布（需授权）。 |
+## Install
 
----
+### Compiled output (recommended for the Web profile)
 
-## 结构
-
-```
-package.json          # dsh.bundle.patch + dsh.client(web) + exports["./client"] + peer 0.1.1-rc.2
-cordis.patch.yml      # 顶层 insert: id=subagent-manager, name=dsh-subagent-manager, config
-tsconfig.json         # host program（排除 src/client）
-tsconfig.client.json  # client program（含 src/client / event-types / css-modules.d.ts）
-tsdown.config.ts      # client bundle（CJS closure-factory + CSS module inline + purity gate）
-src/
-  index.ts            # host 入口：ctx.subagentManager 服务 + /plugins/subagent-manager/state 路由（feature-detect）
-  service.ts          # SubagentManager extends Service；SubagentTemplate / SubagentManagerConfig schema
-  context.d.ts        # declare module @deepseek-ai/cordis -> ctx.subagentManager
-  event-types.ts      # 共享 type-only 事件类型（零运行时 import）
-  client/
-    index.tsx         # 注册 settings.section「子 Agent 管理」+ locale
-    SettingsPage.tsx  # 设置页（M3：列表/表单/启停/归档/导入导出 + 实例视图）
-    locales.ts        # en/zh 字典
-  css-modules.d.ts    # *.module.css 声明
-scripts/verify.mjs    # 构建产物校验（M6 扩展验证金字塔）
-test/                 # 单元测试（node --test，纯 registry/schema/roster 逻辑）
-docs/M0-research.md   # M0 调研结论
-```
-
----
-
-## 开发（本机）
-
-依赖来源：开发期把 DSH 框架链接进 `node_modules`（等价于「链到 DSH checkout」——本机框架包内嵌于 `@deepseek-ai/dsh` CLI 的 `node_modules/@deepseek-ai/*`，均 `0.1.1-rc.2`）。已建立 junction：`196` 个 `@deepseek-ai/*` + `186` 个裸依赖 + `@deepseek-ai/dsh-client-ui-slots@0.1.1-rc.2` + `@types/react` / `@types/react-dom`。
+Build once, then register the local checkout:
 
 ```sh
-pnpm typecheck   # 双 program 类型检查
-pnpm build       # tsc emit + tsdown client bundle
-pnpm verify      # 构建产物校验（M6 扩展）
+git clone https://github.com/Wang-JQ77/dsh-subagent-manager.git
+cd dsh-subagent-manager
+tsc -p tsconfig.json && tsc -p tsconfig.client.json && tsdown
+dsh plugin --profile web add -w .
+dsh web     # restart an already-running Web process
 ```
 
-> `pnpm build` 的 `tsdown` 段需 `pnpm i -D tsdown lightningcss`；本机已装（全局 + 链入 node_modules）并成功产出 `lib/client.js`。
-
-### 安装到 profile（发布后 / GitHub）
-
-> 需要 DSH CLI `0.1.1-rc.2`（或同通道 `^0.1.1-rc.2`）。安装后重启目标 profile。
+If you prefer a tarball:
 
 ```sh
-# npm registry
-npx -p @deepseek-ai/dsh dsh plugin --profile <name> add dsh-subagent-manager
-
-# GitHub (official recommended: 仓库提供自包含 prepare 构建，或提交完整最新 lib/)
-npx -p @deepseek-ai/dsh dsh plugin --profile <name> add gh:<your-org>/dsh-subagent-manager
+npm pack --pack-destination dist
+dsh plugin --profile web add -w ./dist/dsh-subagent-manager-<version>.tgz
 ```
 
-**安装故障排查**：npm registry 双源（npmmirror vs npmjs）混装可能导致「下载成功但未安装」；先清该 profile 的元数据缓存再重装，或改用本地路径 `add .`。GitHub 分发若包声明 `prepare`、且 pnpm ≥10 拦截 Git 依赖构建脚本，需在该 profile 的 `pnpm-workspace.yaml` 显式 `allowBuilds` 后重跑 `add`。
+### Verify the composed bundle
 
-**卸载**：先停运行中实例、导出模板 JSON；settings.yaml 命名空间数据保留，重装可恢复。
+```sh
+dsh --profile web --dump-config | Select-String subagent-manager
+```
 
----
+Expected output contains both the `dsh-subagent-manager` bundle layer and the `subagent-manager` row.
 
-## 开发向导
+## Your first sub-agent in five steps
 
-参考官方 `dsh-plugin-development` Skill（[SKILL.md](https://github.com/NanmiCoder/dsh-agent-teams/blob/master/skills/dsh-plugin-development/SKILL.md)）与
-[dsh-agent-teams](https://github.com/NanmiCoder/dsh-agent-teams) 参考实现。
+1. Open **Settings → 子 Agent 管理 (Sub-agent Manager)**. Three starter specialists
+   (`code-reviewer`, `security-auditor`, `doc-writer`) are seeded on first run.
+2. Review one and flip **Enabled**, or press **Create template**. Every field carries an
+   inline hint explaining what it controls.
+3. In any conversation, ask the model to use a specialist:
+   “Use `code-reviewer` to review `function add(a,b){return a+b}`.”
+4. The model calls `subagent_template_launch`; the answer returns a durable `child_id` and the
+   review result, and the instance appears under **Running instances**.
+5. Manage freely afterwards: disable blocks future launches only, duplicate clones a template
+   disabled, archive removes it, Export/Import move the whole roster as JSON.
+
+## How a launch works
+
+```mermaid
+flowchart LR
+    U["Conversation request"] --> R["System-prompt roster<br>(enabled templates + routes + personas)"]
+    U --> T["subagent_template_launch"]
+    T --> S{"scope check"}
+    S -->|"project mismatch"| X["Rejected loudly"]
+    S -->|"global / matching project"| G{"enabled?"}
+    G -->|"no"| X2["Rejected: enable first"]
+    G -->|"yes"| C["ctx.subagents.startContinuable<br>durable continuable child"]
+    C --> V["Running-instance view<br>+ lifecycle tracking"]
+    C --> Y["Child works, reports back,<br>stays resumable"]
+```
+
+When the lead model answers, it reads the injected roster and either drives the tools directly or
+builds a squad with `agent_teams_*`; a template becomes a member whose definition already carries
+the right provider, model, effort, and persona.
+
+## Template fields
+
+| Field | Default | Meaning |
+| --- | --- | --- |
+| `id` | — (required) | Stable kebab-case key used by instance tracking and audits |
+| `name` | = `id` | Member name handed to agent-teams |
+| `label` | — (required) | Display / roster name shown in lists and the prompt roster |
+| `role` | — (required) | Role description + persona; sent to the child as its persona |
+| `provider` | `fork` | `fork` inherits the calling session context, `spawn` starts clean |
+| `model` | deployment default | Optional model override |
+| `reasoningEffort` | `medium` | `low` / `medium` / `high` |
+| `permissionMode` | `readonly` | `readonly` / `workspace` / `full` (see safety policy) |
+| `agentPreset` | `standard` | Native capability combo: standard / code / minimal / creator |
+| `memberProvider` | `fork` | Strategy used when the template joins an agent-teams squad |
+| `maxDepth` | `1` | Delegation cap; `0` forbids delegation |
+| `enabled` | `true` | Whether new launches are allowed |
+| `tags` | `[]` | Free-form tags for natural-language matching |
+| `scope` | `global` | `global`, or `project:<dir-name>` restricted to one workspace |
+| `schemaVersion` | `1` | Forward-compatible record version |
+
+Every field shows its hint inline in the settings form (English and Chinese).
+
+## Safety policy and lifecycle
+
+- `permissionMode` defaults to `readonly`.
+- `"full"` + `enabled` is refused everywhere (API and form); selecting *full* auto-clears the
+  enabled checkbox.
+- Launch-time gates: an archived/disabled template refuses to launch, and a project-scoped
+  template refuses to launch outside its workspace.
+- Lifecycle contract: editing affects only future launches (children keep their launch snapshot);
+  disabling blocks new launches without touching running ones; archiving removes the template and
+  reports affected children; duplicates are always created disabled.
+
+## Scope: global vs project
+
+`scope` accepts `'global'` (default) or `'project:<dir-name>'`. A scoped template may only be
+launched from a session whose working directory contains that directory name as a whole path
+segment (`my-app` matches `C:/work/my-app/src`, never `my-app-2`). The settings page offers an
+“only current project” filter fed by the live session cwd, so foreign specialists stay out of
+sight while a matching one is guaranteed to appear.
+
+## Working with squads
+
+- The lead model receives an injected roster (enabled templates including provider, model,
+  persona, and depth), so natural-language requests like “assemble reviewers and auditors”
+  resolve without re-describing anyone.
+- The **Join a team** action prints this template's ready-made member parameters; the actual
+  create/join/remove happens in-session through the
+  [`agent_teams_*`](https://github.com/NanmiCoder/dsh-agent-teams) tools, exactly like
+  [dsh-agent-team-gui](https://github.com/toolclub/dsh-agent-team-gui) members.
+
+## Model tools
+
+| Tool | Purpose |
+| --- | --- |
+| `subagent_template_list` | Inspect the roster (optional `id` filter) |
+| `subagent_template_create` | Define a template from parameters (id/name/label/role/…) |
+| `subagent_template_set_enabled` | Toggle new-launch permission for one template |
+| `subagent_template_launch` | Launch a template as a durable continuable child |
+
+## Client data API
+
+The settings page talks to one route (`GET` reads, `POST` writes), so every mutation runs inside
+the host process:
+
+| Action | Payload | Behaviour |
+| --- | --- | --- |
+| `create` | full template | Deduplicates ids, applies the safety policy |
+| `update` | `{ id, patch }` | Merges onto the current record |
+| `set_enabled` | `{ id, enabled }` | Enforces the policy on the merged record |
+| `archive` | `{ id }` | Removes the template and reports affected children |
+| `duplicate` | `{ id, newId? }` | Clones disabled under a new id |
+| `join_team` | `{ id }` | Returns formatted member parameters |
+| `stop` | `{ childId }` | Clears one running instance |
+
+Writes carry `expectedRevision`; a stale value yields **HTTP 409 SETTINGS_CONFLICT** so two open
+settings pages cannot race.
+
+## Host configuration
+
+The bundle inserts one row; every field is optional.
+
+```yaml
+- id: subagent-manager
+  name: dsh-subagent-manager
+  config:
+    storage: auto              # feature-detected settings namespace
+    memberProvider: fork       # fallback member strategy
+    memberMaxDepth: 1          # fallback delegation cap
+    promptSectionOrder: 118    # roster section order
+```
+
+A profile patch replaces the whole `config` object — rewrite all needed keys if you override it.
+
+## Persistence and concurrency
+
+Templates live in the profile's settings store (`~/.dsh/settings.yaml` under the
+`subagent-manager:` namespace) through `dsh-settings`, survive restarts, and carry a monotonic
+revision used for optimistic concurrency. When `dsh-settings` is unavailable the plugin degrades
+to an in-memory store and warns instead of scattering files.
+
+## Development
+
+```sh
+tsc -p tsconfig.json            # host program (types → lib/types)
+tsc -p tsconfig.client.json     # client program
+tsdown                          # browser bundle (lib/client.js)
+node --test test/*.test.mjs     # unit + end-to-end service tests
+node test/seed-settings.mjs     # isolates seeding through the settings adapter
+```
+
+Research notes (native-overlap investigation, environment pitfalls, live test log) live in
+[`docs/M0-research.md`](docs/M0-research.md).
+
+## Borrowed from native `dsh-agent-presets`
+
+This plugin leans on the native presets deliberately rather than fighting them:
+
+- **Starter set seeding** — shipping three built-in templates on an empty store mirrors how
+  native presets deliver `standard / code / minimal / creator` on day one.
+- **Preset references by name** — a template's `agentPreset` points straight at the native
+  capability combos, so composition keeps improving natively while this plugin stays thin.
+- **Profile-scoped persistence** — storing the roster in the settings namespace follows the way
+  native pieces persist theirs instead of inventing another storage root.
+- **Service-key feature detection** — the dual-key `webServer`/`httpServer` probe and lazy
+  registration patterns come straight from the native bundles' compatibility playbook.
+
+They sit on different axes: `dsh-agent-presets` decides what composition a session runs with;
+this plugin manages reusable sub-agents. Because both follow the same conventions, mixing them
+feels like one toolkit.
+
+## Acknowledgements
+
+- [NanmiCoder/dsh-agent-teams](https://github.com/NanmiCoder/dsh-agent-teams) — captain/member
+  model, the plugin-development skill, and the scaffold this project was built against.
+- [toolclub/dsh-agent-team-gui](https://github.com/toolclub/dsh-agent-team-gui) — squad
+  orchestration; pair it with these templates for a full definition-plus-execution stack.
+- [lyh9712/dsh-bg-image](https://github.com/lyh9712/dsh-bg-image) — reference for the Web-profile
+  client-bundle conventions.
+
+## License
+
+[MIT](LICENSE)

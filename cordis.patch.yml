@@ -1,25 +1,23 @@
 # dsh-subagent-manager bundle patch: mounts the sub-agent template manager into
 # the host composition of a dsh profile. The plugin registers a `subagentManager`
-# service (template CRUD + enable), a set of `subagent_template_*` management
-# tools into the shared `tools` registry, a system prompt roster section, and a
-# `/plugins/subagent-manager/state` host route. The client half registers the
-# "Sub-agent Manager" settings section.
+# service (template CRUD + enable), the `subagent_template_*` model-facing tools,
+# a system prompt roster section, and the `/plugins/dsh-subagent-manager/state`
+# host route. The client half registers the "Sub-agent Manager" settings section.
 #
-# Install: `dsh plugin --profile <name> add dsh-subagent-manager` (npm or a
-# local path). The `dsh plugin` command pnpm-installs the package into the
-# profile and reconciles it into the profile's `dsh.profile.bundles` layer list.
+# Install: `dsh plugin --profile <name> add <tarball|local-path>` (see README).
+# Restart the profile after installing or updating.
 - insert:
     - id: subagent-manager
       name: dsh-subagent-manager
       config:
-        # Where template state lives. `profile` = the profile's own settings
-        # namespace (feature-detect `settingsScope`); otherwise a standalone
-        # profile-dir file is used. See docs/M0-research.md.
+        # Where template state lives: `auto` feature-detects the dsh-settings
+        # service (templates persist to the profile's settings namespace);
+        # otherwise an in-memory store is used with a loud warning. See
+        # docs/M0-research.md.
         storage: auto
-        # `ctx.subagents` provider used to launch members/templates as durable
-        # continuable children ('spawn' or 'fork').
-        memberProvider: spawn
-        # Default delegation depth cap applied to a spawned template.
+        # Fallback member strategy for agent-teams joins ('fork' | 'spawn').
+        memberProvider: fork
+        # Fallback delegation depth cap for launched templates.
         memberMaxDepth: 1
         # Prompt-section order for the template roster section.
         promptSectionOrder: 118
