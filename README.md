@@ -183,13 +183,118 @@ sight while a matching one is guaranteed to appear.
 
 ## Working with squads
 
-- The lead model receives an injected roster (enabled templates including provider, model,
-  persona, and depth), so natural-language requests like “assemble reviewers and auditors”
-  resolve without re-describing anyone.
-- The **Join a team** action prints this template's ready-made member parameters; the actual
-  create/join/remove happens in-session through the
-  [`agent_teams_*`](https://github.com/NanmiCoder/dsh-agent-teams) tools, exactly like
-  [dsh-agent-team-gui](https://github.com/toolclub/dsh-agent-team-gui) members.
+### Overview
+
+dsh-subagent-manager and [dsh-agent-teams](https://github.com/NanmiCoder/dsh-agent-teams) form a
+**define + execute** stack. The subagent-manager owns the template registry (definition layer);
+agent-teams owns the multi-agent orchestration (execution layer). They work together through
+two integration points: **roster injection** and **member parameter generation**.
+
+```
+┌─ dsh-subagent-manager (definition layer) ──────────────────────────┐
+│  Template Registry ──→ memberParams()  ──→ ready-made member       │
+│  Roster injection  ──→ system prompt   ──→ captain sees templates  │
+└────────────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─ dsh-agent-teams (execution layer) ────────────────────────────────┐
+│  agent_teams_create / agent_teams_add_member                       │
+│       → resolveMemberLlmSelection()  → validate & resolve route    │
+│       → spawnMember()                → ctx.subagents.startContinuable│
+│       → durable subagent with template persona                     │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+### How they collaborate
+
+1. **Roster awareness** — The captain model receives a system prompt section named
+   `subagent-manager:roster` listing every enabled template with its provider, model, role,
+   permission mode, and member provider. This is injected by `buildRosterText()` in
+   `src/roster.ts`. Natural-language requests like "assemble code-reviewer and security-auditor"
+   resolve without re-describing anyone.
+
+2. **Template → member parameters** — The settings page **Join a team** action calls
+   `memberParams(templateId)` in `src/service.ts`, which extracts the template's `provider`,
+   `model`, `persona` (role), and `reasoningEffort` as a ready-made member descriptor. The
+   descriptor carries `agentTeams: true` so agent-teams knows it is a template-backed member.
+
+3. **Team creation** — The captain uses `agent_teams_create(profile=...)` to build a new team
+   where the profile's `members` array draws directly from template fields:
+   - `name` ← template's `name` (or the `memberProvider` strategy)
+   - `role` ← template's `role` (becomes the member's persona)
+   - `provider` ← template's `provider`
+   - `model` ← template's `model`
+   - `reasoningEffort` ← template's `reasoningEffort`
+   - `executionPrompt` ← template's `description` (optional)
+
+   Alternatively, the captain can add a template-based member to an existing team with
+   `agent_teams_add_member(name, role, provider, model, ...)`.
+
+4. **Route resolution** — For each member, agent-teams calls `resolveMemberLlmSelection()` to
+   validate the provider/model combination against the LLM catalog, apply fallback chains, and
+   confirm the subagent provider supports continuable sessions with persona injection.
+
+5. **Member spawning** — `spawnMember()` in agent-teams calls `ctx.subagents.startContinuable()`
+   with the template's persona, tool filter (denying captain-only tools), and LLM route. The
+   member is created as a durable continuable subagent whose conversation can be resumed later.
+
+6. **Task orchestration** — Members work independently on their assigned tasks, report back to
+   the captain, and the captain decides when the team goal is complete. Members can communicate
+   with each other through agent-teams' direct messaging feature.
+
+### Complete workflow example
+
+```
+1. Create templates in Settings → Sub-agent Manager:
+   ┌──────────────────────┬────────────┬──────────────────────────────┐
+   │ Template             │ provider   │ role                         │
+   ├──────────────────────┼────────────┼──────────────────────────────┤
+   │ code-reviewer        │ fork       │ "Code review specialist"     │
+   │ security-auditor     │ fork       │ "Security audit specialist"  │
+   │ doc-writer           │ fork       │ "Technical documentation"    │
+   └──────────────────────┴────────────┴──────────────────────────────┘
+
+2. In a conversation, ask the model:
+   "Create a team with code-reviewer and security-auditor to review PR #42."
+
+3. The captain reads the roster and calls:
+   agent_teams_create(profile={
+     members: [
+       {name: "code-reviewer", provider: "fork", role: "Code review specialist"},
+       {name: "security-auditor", provider: "fork", role: "Security audit specialist"}
+     ],
+     tasks: [
+       {id: "review", subject: "Review PR #42", assignee: "code-reviewer"},
+       {id: "audit", subject: "Security audit the changes", assignee: "security-auditor"}
+     ]
+   })
+
+4. agent-teams validates each member's route, creates the team directory, and spawns each
+   member as a continuable subagent. The review tasks are assigned automatically.
+
+5. Members work independently. The code reviewer inspects the diff, the security auditor
+   checks for vulnerabilities. Both report back to the captain.
+
+6. The captain aggregates the results and presents the final review summary.
+```
+
+### From the settings page
+
+The **Join a team** button in the template editor prints the member's formatted parameters
+directly. The actual create/join/remove happens in-session through the
+[`agent_teams_*`](https://github.com/NanmiCoder/dsh-agent-teams) tools, exactly like
+[dsh-agent-team-gui](https://github.com/toolclub/dsh-agent-team-gui) members.
+
+### Template design tips for team use
+
+| Tip | Why |
+| --- | --- |
+| Keep `role` self-contained | It becomes the member's persona — include domain, tone, and constraints |
+| Set `reasoningEffort` explicitly | High for audit/analysis tasks, low for quick lookups |
+| Use `tags` for matching | Helps the captain match templates to natural-language requests |
+| Scope `project:` templates | Restrict team members to sessions in the matching workspace |
+| Leave `memberProvider` as `fork` | Inherits session context so members share the captain's tools |
+| Set `description` as execution guidance | It becomes the member's `executionPrompt` in agent-teams |
 
 ## Model tools
 

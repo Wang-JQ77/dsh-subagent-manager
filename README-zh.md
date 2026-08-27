@@ -168,11 +168,113 @@ flowchart LR
 
 ## 配合小队
 
-- 主模型收到注入的名册（启用模板含 provider / model / 人设 / 深度），像「组装审查员和审计员」
-  这类自然语言请求无需重新描述任何人。
-- **加入团队**动作会打印该模板现成的成员参数；真正的创建 / 加入 / 移除发生在会话内，通过
-  [`agent_teams_*`](https://github.com/NanmiCoder/dsh-agent-teams) 工具完成，与
-  [dsh-agent-team-gui](https://github.com/toolclub/dsh-agent-team-gui) 的成员用法一致。
+### 架构概览
+
+dsh-subagent-manager 与 [dsh-agent-teams](https://github.com/NanmiCoder/dsh-agent-teams) 构成
+**定义 + 执行** 栈。subagent-manager 负责模板注册（定义层），agent-teams 负责多 Agent 编排
+（执行层）。两者通过两个集成点协作：**名册注入** 和 **成员参数生成**。
+
+```
+┌─ dsh-subagent-manager（定义层）───────────────────────────────────┐
+│  Template Registry ──→ memberParams()  ──→ 现成的成员参数         │
+│  名册注入           ──→ 系统提示词    ──→ 队长看到可用模板        │
+└───────────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─ dsh-agent-teams（执行层）─────────────────────────────────────────┐
+│  agent_teams_create / agent_teams_add_member                       │
+│       → resolveMemberLlmSelection()  → 校验并解析路由              │
+│       → spawnMember()                → ctx.subagents.startContinuable│
+│       → 带模板人设的持久子 Agent                                     │
+└───────────────────────────────────────────────────────────────────┘
+```
+
+### 协作流程
+
+1. **名册感知** — 队长模型收到名为 `subagent-manager:roster` 的系统提示段落，列出所有已启用
+   模板的 provider、model、role、权限模式和成员提供策略。这段内容由 `src/roster.ts` 中的
+   `buildRosterText()` 注入。像「组装 code-reviewer 和 security-auditor」这类自然语言请求
+   无需重复描述任何人。
+
+2. **模板 → 成员参数** — 设置页的 **加入团队** 动作调用 `src/service.ts` 中的
+   `memberParams(templateId)`，将模板的 `provider`、`model`、`persona`（role）和
+   `reasoningEffort` 提取为现成的成员描述符。描述符附带 `agentTeams: true` 标记，
+   让 agent-teams 知道这是模板支持的成员。
+
+3. **创建团队** — 队长使用 `agent_teams_create(profile=...)` 构建新团队，profile 的
+   `members` 数组直接映射模板字段：
+   - `name` ← 模板的 `name`（或 `memberProvider` 策略）
+   - `role` ← 模板的 `role`（成为成员的人设）
+   - `provider` ← 模板的 `provider`
+   - `model` ← 模板的 `model`
+   - `reasoningEffort` ← 模板的 `reasoningEffort`
+   - `executionPrompt` ← 模板的 `description`（可选）
+
+   或者，队长可以用 `agent_teams_add_member(name, role, provider, model, ...)`
+   向现有团队添加模板成员。
+
+4. **路由解析** — agent-teams 对每个成员调用 `resolveMemberLlmSelection()`，校验
+   provider/model 组合是否在 LLM 目录中、应用兜底链、确认子 Agent 提供者支持
+   带人设注入的持久可续聊会话。
+
+5. **成员生成** — agent-teams 的 `spawnMember()` 调用 `ctx.subagents.startContinuable()`，
+   传入模板的人设、工具过滤（屏蔽队长专用工具）和 LLM 路由。成员被创建为持久可续聊的
+   子 Agent，后续可以恢复对话。
+
+6. **任务编排** — 成员独立执行分配的任务，向队长汇报结果，队长决定团队目标何时完成。
+   成员之间可以通过 agent-teams 的直连消息功能互相通信。
+
+### 完整工作流示例
+
+```
+1. 在 Settings → 子 Agent 管理中创建模板：
+   ┌──────────────────────┬────────────┬──────────────────────────────────┐
+   │ 模板                 │ provider   │ role                             │
+   ├──────────────────────┼────────────┼──────────────────────────────────┤
+   │ code-reviewer        │ fork       │ "代码审查专家"                    │
+   │ security-auditor     │ fork       │ "安全审计专家"                    │
+   │ doc-writer           │ fork       │ "技术文档编写"                    │
+   └──────────────────────┴────────────┴──────────────────────────────────┘
+
+2. 在对话中让模型：
+   "创建一个包含 code-reviewer 和 security-auditor 的团队，审查 PR #42。"
+
+3. 队长读取名册并调用：
+   agent_teams_create(profile={
+     members: [
+       {name: "code-reviewer", provider: "fork", role: "代码审查专家"},
+       {name: "security-auditor", provider: "fork", role: "安全审计专家"}
+     ],
+     tasks: [
+       {id: "review", subject: "审查 PR #42", assignee: "code-reviewer"},
+       {id: "audit", subject: "对变更进行安全审计", assignee: "security-auditor"}
+     ]
+   })
+
+4. agent-teams 校验每个成员的路由，创建团队目录，生成每个成员作为持久子 Agent。
+   审查任务自动分配。
+
+5. 成员独立工作：代码审查员检查 diff，安全审计员检查漏洞。两者向队长汇报。
+
+6. 队长汇总结果，给出最终的审查总结。
+```
+
+### 从设置页操作
+
+模板编辑器中的 **加入团队** 按钮会直接打印该模板的格式化成员参数。实际的创建 / 加入 / 移除
+发生在会话内，通过 [`agent_teams_*`](https://github.com/NanmiCoder/dsh-agent-teams) 工具
+完成，与 [dsh-agent-team-gui](https://github.com/toolclub/dsh-agent-team-gui) 的成员用法一致。
+
+### 团队用模板设计建议
+
+| 建议 | 原因 |
+| --- | --- |
+| 保持 `role` 自包含 | 它将成为成员的人设——包含领域、语气和约束 |
+| 明确设置 `reasoningEffort` | 审计/分析任务用高，快速查询用低 |
+| 用 `tags` 做匹配 | 帮助队长将模板匹配到自然语言请求 |
+| 对 `project:` 模板设置作用域 | 将团队成员限制在匹配工作区的会话中 |
+| 保持 `memberProvider` 为 `fork` | 继承会话上下文，成员共享队长的工具 |
+| 设置 `description` 作为执行指导 | 在 agent-teams 中成为成员的 `executionPrompt` |
 
 ## 模型工具
 
