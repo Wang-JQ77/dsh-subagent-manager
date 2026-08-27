@@ -28,33 +28,57 @@ prompt.
 | Optimistic concurrency | Multi-session writes conflict loudly with HTTP 409 instead of silently racing |
 | Instance view + JSON port | See and stop live children; export/import the whole roster |
 
-## Requirements
-
-- DeepSeek Harness `0.1.1` channel (developed and verified against `0.1.1-rc.2`)
-- The **Web** profile
-- Node.js `>=22.19.0 <23` or `>=24`
-- TypeScript + tsdown available locally when building from source (`npm i -g typescript@5.9.3 tsdown@0.22.2 lightningcss@1.33.0` or install them locally)
-
 ## Install
 
-### Compiled output (recommended for the Web profile)
+> **No build step needed.** This repository ships prebuilt output in `lib/` (the same convention
+> as [lyh9712/dsh-bg-image](https://github.com/lyh9712/dsh-bg-image)), and the package declares no
+> install-time build scripts, so a plain git/tarball install works.
 
-Build once, then register the local checkout:
+### Requirements
+
+- DeepSeek Harness on the `0.1.1` channel (developed and verified against `0.1.1-rc.2`)
+- The **Web** profile
+- Node.js `>=22.19.0 <23` or `>=24` (same range as DSH itself)
+
+### Option 1 — install straight from GitHub (one command)
+
+```sh
+dsh plugin --profile web add -w github:Wang-JQ77/dsh-subagent-manager
+```
+
+For reproducibility, pin a tag or full commit instead of the branch tip:
+
+```sh
+dsh plugin --profile web add -w github:Wang-JQ77/dsh-subagent-manager#v0.1.0-rc.2
+```
+
+### Option 2 — install from a release tarball
+
+Download the latest `.tgz` from [GitHub Releases](https://github.com/Wang-JQ77/dsh-subagent-manager/releases),
+then:
+
+```sh
+dsh plugin --profile web add -w ./dsh-subagent-manager-0.1.0-rc.2.tgz
+```
+
+A tarball avoids git entirely — no git binary and no pnpm build approval needed.
+
+### Option 3 — from source (contributors)
 
 ```sh
 git clone https://github.com/Wang-JQ77/dsh-subagent-manager.git
 cd dsh-subagent-manager
+# rebuild only if you changed sources (lib/ is committed and already current)
+npm i -g typescript@5.9.3 tsdown@0.22.2 lightningcss@1.33.0   # or use local installs
 tsc -p tsconfig.json && tsc -p tsconfig.client.json && tsdown
 dsh plugin --profile web add -w .
-dsh web     # restart an already-running Web process
 ```
 
-If you prefer a tarball:
-
-```sh
-npm pack --pack-destination dist
-dsh plugin --profile web add -w ./dist/dsh-subagent-manager-<version>.tgz
-```
+> [!IMPORTANT]
+> Framework packages (`@deepseek-ai/dsh-*`) are **not** something you install separately — the DSH
+> CLI ships them inside its own bundle, and the plugin resolves them from there at runtime.
+> If `pnpm` ≥ 10 asks for build approval during `add`, **you do not need to allow anything**:
+> this package has no build scripts.
 
 ### Verify the composed bundle
 
@@ -62,7 +86,27 @@ dsh plugin --profile web add -w ./dist/dsh-subagent-manager-<version>.tgz
 dsh --profile web --dump-config | Select-String subagent-manager
 ```
 
-Expected output contains both the `dsh-subagent-manager` bundle layer and the `subagent-manager` row.
+Expected output contains both the `dsh-subagent-manager` bundle layer and the `subagent-manager`
+row with its `config:` block.
+
+### After installing
+
+- **Restart the Web process** — an already-running Web instance keeps the old composition until it
+  is restarted (`dsh web` or restart the running process).
+- Open **Settings → 子 Agent 管理**. Three starter templates are seeded on first run.
+
+### Troubleshooting
+
+- **Nothing shows in `dump-config`** — re-run `dsh plugin --profile web install` to reconcile
+  dependencies, then `dump-config` again. The profile must list the package in its dependencies.
+- **The settings page is there but the model says it has no `subagent_template_*` tools** — start
+  a *new* session: the tool catalog is captured per session. Also note that presets with a
+  minimal bootstrap (e.g. `liangshen`) expose only two tools until the first turn completes;
+  the full catalog appears afterwards.
+- **Templates disappeared after a restart** — you are running an old build that predates the
+  settings-persistence fix. Update to the latest release and reinstall.
+- **The "打开配置文件" button in the settings page does nothing** — that is the DSH shell's own
+  button, not this plugin's; associate `.yaml`/`.yml` with an editor on your system.
 
 ## Your first sub-agent in five steps
 

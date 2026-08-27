@@ -26,33 +26,55 @@
 | 乐观并发控制 | 多会话同时写会以 HTTP 409 明确冲突，而不是静默竞争 |
 | 运行实例视图 + JSON 导入导出 | 查看、停止运行中的子 Agent；整个名册可导入导出 |
 
-## 环境要求
+## 安装
+
+> **无需构建。** 本仓库直接附带编译产物 `lib/`（与
+> [lyh9712/dsh-bg-image](https://github.com/lyh9712/dsh-bg-image) 相同的发布约定），且包内不含安装期构建脚本，
+> git / tarball 直接装即可用。
+
+### 环境要求
 
 - DeepSeek Harness `0.1.1` 通道（开发与验证基于 `0.1.1-rc.2`）
 - **Web** profile
-- Node.js `>=22.19.0 <23` 或 `>=24`
-- 从源码构建时本机需要 TypeScript + tsdown（`npm i -g typescript@5.9.3 tsdown@0.22.2 lightningcss@1.33.0`，或本地安装）
+- Node.js `>=22.19.0 <23` 或 `>=24`（与 DSH 要求一致）
 
-## 安装
+### 方式一 —— 直接从 GitHub 安装（一条命令）
 
-### 编译产物（推荐给 Web profile）
+```sh
+dsh plugin --profile web add -w github:Wang-JQ77/dsh-subagent-manager
+```
 
-先构建一次，再注册本地目录：
+要可复现安装，请钉住 tag 或完整 commit，而不是分支头：
+
+```sh
+dsh plugin --profile web add -w github:Wang-JQ77/dsh-subagent-manager#v0.1.0-rc.2
+```
+
+### 方式二 —— 从 Release 的 tarball 安装
+
+从 [GitHub Releases](https://github.com/Wang-JQ77/dsh-subagent-manager/releases) 下载最新的 `.tgz`，然后：
+
+```sh
+dsh plugin --profile web add -w ./dsh-subagent-manager-0.1.0-rc.2.tgz
+```
+
+tarball 方式完全不依赖 git，也不需要 pnpm 的构建授权。
+
+### 方式三 —— 从源码安装（贡献者）
 
 ```sh
 git clone https://github.com/Wang-JQ77/dsh-subagent-manager.git
 cd dsh-subagent-manager
+# 只有改过源码才需要重新构建（仓库里的 lib/ 已经是最新构建产物）
+npm i -g typescript@5.9.3 tsdown@0.22.2 lightningcss@1.33.0   # 或本地安装
 tsc -p tsconfig.json && tsc -p tsconfig.client.json && tsdown
 dsh plugin --profile web add -w .
-dsh web     # 如果 Web 已在运行，重启进程
 ```
 
-也可以使用 tarball：
-
-```sh
-npm pack --pack-destination dist
-dsh plugin --profile web add -w ./dist/dsh-subagent-manager-<version>.tgz
-```
+> [!IMPORTANT]
+> 框架包（`@deepseek-ai/dsh-*`）**不需要你单独安装**——DSH CLI 自身已经打包携带，
+> 插件运行时从 CLI 的 bundle 里解析。如果 `pnpm` ≥ 10 在 `add` 时询问构建授权，
+> **不需要允许**：本包没有构建脚本。
 
 ### 校验组合结果
 
@@ -60,7 +82,22 @@ dsh plugin --profile web add -w ./dist/dsh-subagent-manager-<version>.tgz
 dsh --profile web --dump-config | Select-String subagent-manager
 ```
 
-预期输出同时包含 `dsh-subagent-manager` bundle 层和 `subagent-manager` 插件行。
+预期输出同时包含 `dsh-subagent-manager` bundle 层和带 `config:` 的 `subagent-manager` 插件行。
+
+### 安装之后
+
+- **重启 Web 进程**——已在运行的 Web 实例不会加载新插件代码，必须重启（`dsh web` 或重启现有进程）。
+- 打开 **Settings → 子 Agent 管理**，首次运行会播种三个内置模板。
+
+### 故障排查
+
+- **`dump-config` 里看不到插件** —— 重新执行 `dsh plugin --profile web install` 对账依赖后再看；
+  确认 profile 的 dependencies 里有本包。
+- **设置页出现了，但模型说没有 `subagent_template_*` 工具** —— 新建一个会话：工具目录是按会话捕获的；
+  另外，带有极简引导阶段的预设（如 `liangshen`）在首轮回复前只暴露两个工具，首轮结束后才会开放完整目录。
+- **重启后模板消失了** —— 你用的是 settings 持久化修复之前的旧构建，请升级到最新版本重装。
+- **设置页的「打开配置文件」按钮没反应** —— 那是 DSH 设置壳自带的按钮，与本插件无关；
+  给系统里的 `.yaml`/`.yml` 关联一个编辑器即可。
 
 ## 五步创建第一个子 Agent
 

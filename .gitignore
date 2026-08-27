@@ -1,7 +1,11 @@
 node_modules/
-lib/
+dist/
 *.tsbuildinfo
 .DS_Store
 *.log
 .cowork-temp/
 *.tgz
+# NOTE: lib/ is intentionally committed: this repo ships built output so
+# `dsh plugin add` works without a local build step (same convention as
+# lyh9712/dsh-bg-image). Rebuild before every release commit:
+#   tsc -p tsconfig.json && tsc -p tsconfig.client.json && tsdown
