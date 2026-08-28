@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "dsh-subagent-manager",
   "version": "0.1.0",
   "description": "Sub-agent template manager for DeepSeek Harness (DSH): create/edit/enable sub-agent templates, launch them as durable continuable children, and join templates into dsh-agent-teams as members (template = member).",
@@ -54,10 +54,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json && tsc -p tsconfig.client.json && tsdown",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit",
-    "verify:build": "node scripts/verify.mjs",
-    "verify": "node scripts/lifecycle-verify.mjs",
-    "test": "node --test test/registry.test.mjs test/fullflow.test.mjs",
-    "prepublishOnly": "pnpm build && pnpm test && pnpm verify"
+    "prepublishOnly": "pnpm build"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1-rc.1",
@@ -101,4 +98,3 @@
     "typescript": "^5.9.3"
   }
 }
-

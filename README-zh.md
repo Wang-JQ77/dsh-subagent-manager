@@ -2,18 +2,10 @@
 
 [English](README.md) | [简体中文](README-zh.md)
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-![Node.js](https://img.shields.io/badge/node-%3E%3D22.19%20%7C%7C%3E%3D24-blue)
-![DeepSeek Harness](https://img.shields.io/badge/DSH-0.1.1%E2%80%91rc.2-informational)
-![Platform](https://img.shields.io/badge/profile-web-important)
-
 **为 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 提供可复用的子 Agent 模板库。**
-把每个专家定义一次——展示名、人设、模型路由、权限模式、深度上限——之后可以在任意会话里把它拉起为
-持久、可续聊的子 Agent，限定到单个项目，或作为成员交给一个 Agent 小队。
+把每个专家定义一次——展示名、人设、模型路由、权限模式、深度上限——之后可以在任意会话里把它拉起为持久、可续聊的子 Agent，限定到单个项目，或作为成员交给一个 Agent 小队。
 
 ## 为什么需要这个插件
-
-子 agent 值得「定义一次、长期复用」，而不是在每条提示里重新描述一遍。
 
 | 能力 | 给用户带来的价值 |
 | --- | --- |
@@ -23,344 +15,58 @@
 | 项目作用域 | `global` 或 `project:<id>`，拉起时二次校验；设置页隐藏其他项目的模板 |
 | 名册注入 | 主模型始终能看到启用中的专家及其路由和人设 |
 | 受管生命周期 | 编辑不打扰运行中的实例；停用只挡新拉起 |
-| 乐观并发控制 | 多会话同时写会以 HTTP 409 明确冲突，而不是静默竞争 |
-| 运行实例视图 + JSON 导入导出 | 查看、停止运行中的子 Agent；整个名册可导入导出 |
+| 运行实例视图 + JSON 导入导出 | 查看、停止运行中的子 Agent；导出/导入整个模板库 |
 
 ## 安装
 
-> **无需构建。** 本仓库直接附带编译产物 `lib/`（与
-> [lyh9712/dsh-bg-image](https://github.com/lyh9712/dsh-bg-image) 相同的发布约定），且包内不含安装期构建脚本，
-> git / tarball 直接装即可用。
-
-### 环境要求
-
-- DeepSeek Harness `0.1.1` 通道（开发与验证基于 `0.1.1-rc.2`）
-- **Web** profile
-- Node.js `>=22.19.0 <23` 或 `>=24`（与 DSH 要求一致）
-
-### 方式一 —— 直接从 GitHub 安装（一条命令）
-
-```sh
-dsh plugin --profile web add -w github:Wang-JQ77/dsh-subagent-manager
+```bash
+# 安装到 web profile
+dsh plugin --profile web add dsh-subagent-manager
+# 重启 dsh 使插件生效
+dsh web
 ```
 
-要可复现安装，请钉住 tag 或完整 commit，而不是分支头：
+## 快速开始
 
-```sh
-dsh plugin --profile web add -w github:Wang-JQ77/dsh-subagent-manager#v0.1.0
-```
+1. 打开**设置 → Sub-Agent Manager**
+2. 点击**创建模板**——填写展示名、人设、模型和权限模式
+3. 保存模板——它会在名册中显示并处于启用状态
+4. 在任意会话中，提及子 Agent 名称或使用名册拉起它
+5. 拉起的子 Agent 作为持久子进程运行——你可以随时切换回它
 
-### 方式二 —— 从 Release 的 tarball 安装
+> 模板限定为 `global` 或特定项目。设置页只显示当前项目相关的模板。
 
-从 [GitHub Releases](https://github.com/Wang-JQ77/dsh-subagent-manager/releases) 下载最新的 `.tgz`，然后：
+## 模板配置
 
-```sh
-dsh plugin --profile web add -w ./dsh-subagent-manager-0.1.0.tgz
-```
+每个模板定义：
 
-tarball 方式完全不依赖 git，也不需要 pnpm 的构建授权。
-
-### 方式三 —— 从源码安装（贡献者）
-
-```sh
-git clone https://github.com/Wang-JQ77/dsh-subagent-manager.git
-cd dsh-subagent-manager
-# 只有改过源码才需要重新构建（仓库里的 lib/ 已经是最新构建产物）
-npm i -g typescript@5.9.3 tsdown@0.22.2 lightningcss@1.33.0   # 或本地安装
-tsc -p tsconfig.json && tsc -p tsconfig.client.json && tsdown
-dsh plugin --profile web add -w .
-```
-
-> [!IMPORTANT]
-> 框架包（`@deepseek-ai/dsh-*`）**不需要你单独安装**——DSH CLI 自身已经打包携带，
-> 插件运行时从 CLI 的 bundle 里解析。如果 `pnpm` ≥ 10 在 `add` 时询问构建授权，
-> **不需要允许**：本包没有构建脚本。
-
-### 校验组合结果
-
-```sh
-dsh --profile web --dump-config | Select-String subagent-manager
-```
-
-预期输出同时包含 `dsh-subagent-manager` bundle 层和带 `config:` 的 `subagent-manager` 插件行。
-
-### 安装之后
-
-- **重启 Web 进程**——已在运行的 Web 实例不会加载新插件代码，必须重启（`dsh web` 或重启现有进程）。
-- 打开 **Settings → 子 Agent 管理**，首次运行会播种三个内置模板。
-
-### 故障排查
-
-- **`dump-config` 里看不到插件** —— 重新执行 `dsh plugin --profile web install` 对账依赖后再看；
-  确认 profile 的 dependencies 里有本包。
-- **设置页出现了，但模型说没有 `subagent_template_*` 工具** —— 新建一个会话：工具目录是按会话捕获的；
-  另外，带有极简引导阶段的预设（如 `liangshen`）在首轮回复前只暴露两个工具，首轮结束后才会开放完整目录。
-- **重启后模板消失了** —— 你用的是 settings 持久化修复之前的旧构建，请升级到最新版本重装。
-- **设置页的「打开配置文件」按钮没反应** —— 那是 DSH 设置壳自带的按钮，与本插件无关；
-  给系统里的 `.yaml`/`.yml` 关联一个编辑器即可。
-
-## 五步创建第一个子 Agent
-
-1. 打开 **Settings → 子 Agent 管理**。首次运行会播种三个内置专家：
-   `code-reviewer`、`security-auditor`、`doc-writer`。
-2. 检查其中一个并打开 **已启用**，或点击 **新建模板**。表单里每个字段都有内联说明。
-3. 在任意对话里让模型调用专家：
-   「用 `code-reviewer` 审查 `function add(a,b){return a+b}`」。
-4. 模型调用 `subagent_template_launch`；回答里会返回持久化的 `child_id` 和审查结论，
-   实例同时出现在 **运行实例** 区块。
-5. 之后随意管理：停用只挡新拉起；复制生成默认禁用的副本；归档移除模板；
-   导出/导入用 JSON 移动整个名册。
-
-## 一次拉起是怎么发生的
-
-```mermaid
-flowchart LR
-    U["会话请求"] --> R["系统提示名册<br>（启用模板 + 路由 + 人设）"]
-    U --> T["subagent_template_launch"]
-    T --> S{"scope 校验"}
-    S -->|"project 不匹配"| X["明确拒绝"]
-    S -->|"global / 项目匹配"| G{"enabled?"}
-    G -->|"否"| X2["拒绝：请先启用"]
-    G -->|"是"| C["ctx.subagents.startContinuable<br>持久可续聊子 Agent"]
-    C --> V["运行实例视图<br>+ 生命周期登记"]
-    C --> Y["子 Agent 干活、回传结论<br>并保持可续聊"]
-```
-
-主模型回答时会读到注入的名册：要么直接驱动工具，要么配合 `agent_teams_*` 组队——
-模板本身已经带好了 provider、model、强度与人设。
-
-## 模板字段
-
-| 字段 | 默认值 | 含义 |
-| --- | --- | --- |
-| `id` | —（必填） | 稳定 kebab-case 标识，实例跟踪与审计的 key |
-| `name` | = `id` | 交给 agent-teams 的成员名 |
-| `label` | —（必填） | 展示名 / 名册名，列表与系统提示名册使用它 |
-| `role` | —（必填） | 角色描述 + 人设；拉起时作为子 Agent 的人设传入 |
-| `provider` | `fork` | `fork` 继承调用方会话上下文，`spawn` 全新开始 |
-| `model` | 部署默认 | 可选模型覆盖 |
-| `reasoningEffort` | `medium` | `low` / `medium` / `high` |
-| `permissionMode` | `readonly` | 只读 / 工作区 / 全权限（见安全策略） |
-| `agentPreset` | `standard` | 原生能力组合：standard / code / minimal / creator |
-| `memberProvider` | `fork` | 该模板加入小队时的成员生成方式 |
-| `maxDepth` | `1` | 委托上限；`0` 禁止再委托 |
-| `enabled` | `true` | 是否允许新拉起 |
-| `tags` | `[]` | 自然语言匹配用的自由标签 |
-| `scope` | `global` | `global`，或 `project:<目录名>` 限定到单个工作区 |
-| `schemaVersion` | `1` | 向前兼容的记录版本 |
-
-设置表单里每个字段的说明都是内联显示的（中英双语）。
-
-## 安全策略与生命周期
-
-- `permissionMode` 默认只读。
-- 「全权限 + 启用」的组合在任何入口都会被拒绝（API 与表单一致）；选择 *full* 会自动取消启用勾选。
-- 拉起前校验：已归档 / 已停用的模板拒绝拉起；project 模板在工作区不匹配时拒绝拉起。
-- 生命周期约定：编辑只影响之后的拉起（运行中的子 Agent 保留启动快照）；停用只挡新拉起，
-  不影响运行中实例；归档移除模板并报告受影响实例；副本一律以禁用状态创建。
-
-## 作用域：global 与 project
-
-`scope` 接受 `'global'`（默认）或 `'project:<目录名>'`。被限定的模板只允许从工作目录包含该
-目录名的会话里拉起（整段路径段匹配：`my-app` 匹配 `C:/work/my-app/src`，不会误匹配
-`my-app-2`）。设置页提供由实时会话 cwd 驱动的「仅当前项目」过滤，外项目的专家自动隐藏，
-匹配中的专家一定可见。
-
-## 配合小队
-
-### 架构概览
-
-dsh-subagent-manager 与 [dsh-agent-teams](https://github.com/NanmiCoder/dsh-agent-teams) 构成
-**定义 + 执行** 栈。subagent-manager 负责模板注册（定义层），agent-teams 负责多 Agent 编排
-（执行层）。两者通过两个集成点协作：**名册注入** 和 **成员参数生成**。
-
-```
-┌─ dsh-subagent-manager（定义层）───────────────────────────────────┐
-│  Template Registry ──→ memberParams()  ──→ 现成的成员参数         │
-│  名册注入           ──→ 系统提示词    ──→ 队长看到可用模板        │
-└───────────────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-┌─ dsh-agent-teams（执行层）─────────────────────────────────────────┐
-│  agent_teams_create / agent_teams_add_member                       │
-│       → resolveMemberLlmSelection()  → 校验并解析路由              │
-│       → spawnMember()                → ctx.subagents.startContinuable│
-│       → 带模板人设的持久子 Agent                                     │
-└───────────────────────────────────────────────────────────────────┘
-```
-
-### 协作流程
-
-1. **名册感知** — 队长模型收到名为 `subagent-manager:roster` 的系统提示段落，列出所有已启用
-   模板的 provider、model、role、权限模式和成员提供策略。这段内容由 `src/roster.ts` 中的
-   `buildRosterText()` 注入。像「组装 code-reviewer 和 security-auditor」这类自然语言请求
-   无需重复描述任何人。
-
-2. **模板 → 成员参数** — 设置页的 **加入团队** 动作调用 `src/service.ts` 中的
-   `memberParams(templateId)`，将模板的 `provider`、`model`、`persona`（role）和
-   `reasoningEffort` 提取为现成的成员描述符。描述符附带 `agentTeams: true` 标记，
-   让 agent-teams 知道这是模板支持的成员。
-
-3. **创建团队** — 队长使用 `agent_teams_create(profile=...)` 构建新团队，profile 的
-   `members` 数组直接映射模板字段：
-   - `name` ← 模板的 `name`（或 `memberProvider` 策略）
-   - `role` ← 模板的 `role`（成为成员的人设）
-   - `provider` ← 模板的 `provider`
-   - `model` ← 模板的 `model`
-   - `reasoningEffort` ← 模板的 `reasoningEffort`
-   - `executionPrompt` ← 模板的 `description`（可选）
-
-   或者，队长可以用 `agent_teams_add_member(name, role, provider, model, ...)`
-   向现有团队添加模板成员。
-
-4. **路由解析** — agent-teams 对每个成员调用 `resolveMemberLlmSelection()`，校验
-   provider/model 组合是否在 LLM 目录中、应用兜底链、确认子 Agent 提供者支持
-   带人设注入的持久可续聊会话。
-
-5. **成员生成** — agent-teams 的 `spawnMember()` 调用 `ctx.subagents.startContinuable()`，
-   传入模板的人设、工具过滤（屏蔽队长专用工具）和 LLM 路由。成员被创建为持久可续聊的
-   子 Agent，后续可以恢复对话。
-
-6. **任务编排** — 成员独立执行分配的任务，向队长汇报结果，队长决定团队目标何时完成。
-   成员之间可以通过 agent-teams 的直连消息功能互相通信。
-
-### 完整工作流示例
-
-```
-1. 在 Settings → 子 Agent 管理中创建模板：
-   ┌──────────────────────┬────────────┬──────────────────────────────────┐
-   │ 模板                 │ provider   │ role                             │
-   ├──────────────────────┼────────────┼──────────────────────────────────┤
-   │ code-reviewer        │ fork       │ "代码审查专家"                    │
-   │ security-auditor     │ fork       │ "安全审计专家"                    │
-   │ doc-writer           │ fork       │ "技术文档编写"                    │
-   └──────────────────────┴────────────┴──────────────────────────────────┘
-
-2. 在对话中让模型：
-   "创建一个包含 code-reviewer 和 security-auditor 的团队，审查 PR #42。"
-
-3. 队长读取名册并调用：
-   agent_teams_create(profile={
-     members: [
-       {name: "code-reviewer", provider: "fork", role: "代码审查专家"},
-       {name: "security-auditor", provider: "fork", role: "安全审计专家"}
-     ],
-     tasks: [
-       {id: "review", subject: "审查 PR #42", assignee: "code-reviewer"},
-       {id: "audit", subject: "对变更进行安全审计", assignee: "security-auditor"}
-     ]
-   })
-
-4. agent-teams 校验每个成员的路由，创建团队目录，生成每个成员作为持久子 Agent。
-   审查任务自动分配。
-
-5. 成员独立工作：代码审查员检查 diff，安全审计员检查漏洞。两者向队长汇报。
-
-6. 队长汇总结果，给出最终的审查总结。
-```
-
-### 从设置页操作
-
-模板编辑器中的 **加入团队** 按钮会直接打印该模板的格式化成员参数。实际的创建 / 加入 / 移除
-发生在会话内，通过 [`agent_teams_*`](https://github.com/NanmiCoder/dsh-agent-teams) 工具
-完成，与 [dsh-agent-team-gui](https://github.com/toolclub/dsh-agent-team-gui) 的成员用法一致。
-
-### 团队用模板设计建议
-
-| 建议 | 原因 |
+| 字段 | 说明 |
 | --- | --- |
-| 保持 `role` 自包含 | 它将成为成员的人设——包含领域、语气和约束 |
-| 明确设置 `reasoningEffort` | 审计/分析任务用高，快速查询用低 |
-| 用 `tags` 做匹配 | 帮助队长将模板匹配到自然语言请求 |
-| 对 `project:` 模板设置作用域 | 将团队成员限制在匹配工作区的会话中 |
-| 保持 `memberProvider` 为 `fork` | 继承会话上下文，成员共享队长的工具 |
-| 设置 `description` 作为执行指导 | 在 agent-teams 中成为成员的 `executionPrompt` |
+| 展示名 | 子 Agent 在名册中显示的名称 |
+| 人设 | 系统提示词 / 角色描述 |
+| 模型路由 | 该 Agent 使用的 LLM 模型 |
+| 权限模式 | 只读（默认）或完全访问 |
+| 深度上限 | 最大递归深度 |
+| 项目作用域 | `global` 或 `project:<id>` |
 
-## 模型工具
+## 使用方式
 
-| 工具 | 用途 |
-| --- | --- |
-| `subagent_template_list` | 查看名册（可选 `id` 过滤） |
-| `subagent_template_create` | 按参数定义模板（id/name/label/role/…） |
-| `subagent_template_set_enabled` | 切换单个模板的新拉起许可 |
-| `subagent_template_launch` | 把模板拉起为持久可续聊子 Agent |
+### 拉起子 Agent
 
-## 客户端数据 API
+在会话中输入子 Agent 名称或使用名册 UI 拉起它。Agent 会在自己的可恢复会话中启动。
 
-设置页只和一个路由通信（`GET` 读、`POST` 写），所有变更都在宿主进程内完成：
+### 查看运行实例
 
-| Action | 载荷 | 行为 |
-| --- | --- | --- |
-| `create` | 完整模板 | id 去重 + 应用安全策略 |
-| `update` | `{ id, patch }` | 合并到当前记录 |
-| `set_enabled` | `{ id, enabled }` | 在合并后的记录上强制执行安全策略 |
-| `archive` | `{ id }` | 移除模板并报告受影响的运行实例 |
-| `duplicate` | `{ id, newId? }` | 以禁用状态克隆到新 id |
-| `join_team` | `{ id }` | 返回格式化后的成员参数 |
-| `stop` | `{ childId }` | 清除一个运行实例 |
+进入**设置 → Sub-Agent Manager → 运行实例**查看所有活跃的子 Agent。你可以在此处停止任何实例。
 
-写入携带 `expectedRevision`；过期值返回 **HTTP 409 SETTINGS_CONFLICT**，两个打开的设置页不会互相覆盖。
+### 导出/导入模板
 
-## Host 配置
+使用设置页中的 JSON 导入导出功能备份或迁移模板库。
 
-bundle 只插入一行；所有字段均可选。
+### 与 Agent-Teams 集成
 
-```yaml
-- id: subagent-manager
-  name: dsh-subagent-manager
-  config:
-    storage: auto              # 自动探测 settings 命名空间
-    memberProvider: fork       # 成员策略兜底
-    memberMaxDepth: 1          # 委托深度兜底
-    promptSectionOrder: 118    # 名册段落顺序
-```
+模板可作为 `dsh-agent-teams` 的团队成员。每个模板定义一个专家角色，小队可以分配任务给它。
 
-如果 profile patch 覆盖这一行，必须重写全部键——patch 会整体替换 `config` 对象，不做深合并。
+## License
 
-## 持久化与并发
-
-模板存放在 profile 的 settings 存储里（`~/.dsh/settings.yaml` 的 `subagent-manager:` 命名空间，
-经 `dsh-settings` 写入），重启后保留，并用单调递增 revision 支持乐观并发。当 `dsh-settings`
-不可用时，插件降级为内存存储并明确告警，绝不向别处散落文件。
-
-## 开发
-
-```sh
-tsc -p tsconfig.json            # host program（类型 → lib/types）
-tsc -p tsconfig.client.json     # client program
-tsdown                          # 浏览器 bundle（lib/client.js）
-node --test test/*.test.mjs     # 单元 + 服务端到端测试
-node test/seed-settings.mjs     # 单独验证 settings 适配器上的播种逻辑
-```
-
-调研记录（原生重叠分析、环境坑位、实测日志）见
-[`docs/M0-research.md`](docs/M0-research.md)。
-
-## 对原生 `dsh-agent-presets` 的借鉴
-
-本插件有意站在原生 presets 之上，而不是和它们对立：
-
-- **内置起始集播种** —— 空库时交付三个内置模板，正对应原生 presets 在第一天就给出
-  `standard / code / minimal / creator` 的做法。
-- **按名字引用预设** —— 模板的 `agentPreset` 直接指向原生能力组合，原生侧的编排持续进化，
-  本插件保持轻量。
-- **随 profile 持久化** —— 把名册放进 settings 命名空间，遵循原生组件的持久化方式，
-  而不是再造一个存储根。
-- **service-key 特性探测** —— 双键 `webServer`/`httpServer` 探测与延迟注册模式，
-  直接借鉴自原生 bundle 的兼容性打法。
-
-两者位于不同轴线：`dsh-agent-presets` 决定某个会话以什么组合运行；本插件管理可复用的子 Agent。
-因为遵循同一套约定，混用起来像一个工具箱。
-
-## 致谢
-
-- [NanmiCoder/dsh-agent-teams](https://github.com/NanmiCoder/dsh-agent-teams) —— captain/member
-  模型、插件开发 Skill，以及本项目所参考的脚手架。
-- [toolclub/dsh-agent-team-gui](https://github.com/toolclub/dsh-agent-team-gui) —— 小队编排；
-  用这些模板配上它即可组成完整的「定义 + 执行」栈。
-- [lyh9712/dsh-bg-image](https://github.com/lyh9712/dsh-bg-image) —— Web profile 客户端
-  bundle 约定的参考实现。
-
-## 许可
-
-[MIT](LICENSE)
+MIT
